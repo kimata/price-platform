@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
+from typing import Callable
 
 
 @dataclass(frozen=True)
@@ -26,8 +27,14 @@ class _RateLimitState:
 class InMemoryRateLimiter:
     """Simple in-memory rate limiter for authentication endpoints."""
 
-    def __init__(self, settings: RateLimitSettings | None = None):
+    def __init__(
+        self,
+        settings: RateLimitSettings | None = None,
+        *,
+        now_fn: Callable[[], float] | None = None,
+    ):
         self.settings = settings or RateLimitSettings()
+        self._now_fn = now_fn or time.time
         self._state = _RateLimitState()
 
     def is_locked_out(self, ip: str) -> bool:
@@ -36,7 +43,7 @@ class InMemoryRateLimiter:
             if lockout_until is None:
                 return False
 
-            now = time.time()
+            now = self._now_fn()
             if now < lockout_until:
                 return True
 
@@ -44,7 +51,7 @@ class InMemoryRateLimiter:
             return False
 
     def record_failure(self, ip: str) -> bool:
-        now = time.time()
+        now = self._now_fn()
         with self._state.lock:
             if ip in self._state.lockouts and now < self._state.lockouts[ip]:
                 return False
@@ -68,7 +75,7 @@ class InMemoryRateLimiter:
             if lockout_until is None:
                 return 0
 
-            return max(0, int(lockout_until - time.time()))
+            return max(0, int(lockout_until - self._now_fn()))
 
     def clear_state(self) -> None:
         with self._state.lock:
