@@ -29,6 +29,15 @@ src/price_platform/
 └── webapp/         # Flask アプリ基盤 (ファクトリ, CORS, セキュリティヘッダ, リクエストコンテキスト)
 ```
 
+## リポジトリとデプロイ
+
+- プライマリリポジトリは GitLab (`gitlab.green-rabbit.net`)。push すると GitHub (`github.com/kimata/price-platform`) に自動同期される。
+- 利用側アプリケーションは GitHub URL + コミットハッシュで依存を固定する:
+  ```
+  "price-platform @ git+https://github.com/kimata/price-platform@<commit-hash>"
+  ```
+- このライブラリを更新した後は、利用側アプリケーションの `pyproject.toml` のハッシュも更新する。
+
 ## 開発ガイドライン
 
 - `my_lib` は利用側アプリケーション群が共有する別の内部ライブラリ。config/loader.py と config/models.py が依存している。
