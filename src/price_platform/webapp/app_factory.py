@@ -116,7 +116,7 @@ def install_common_routes(
     app: flask.Flask,
     *,
     settings: CommonRoutesSettings,
-    healthcheck: Callable[[], None],
+    healthcheck: Callable[[], object],
     logger: logging.Logger | None = None,
 ) -> None:
     """Install shared health / SSE / static asset / error routes."""
