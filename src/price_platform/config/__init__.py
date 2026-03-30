@@ -1,6 +1,13 @@
 """Shared configuration API for price-platform applications."""
 
-from .loader import load_app_config, parse_app_config, warn_unknown_keys
+from .loader import (
+    AppConfigSpec,
+    load_app_config,
+    load_app_config_for,
+    parse_app_config,
+    parse_app_config_for,
+    warn_unknown_keys,
+)
 from .models import (
     AmazonStoreConfig,
     AppConfig,
@@ -27,6 +34,7 @@ from .models import (
 __all__ = [
     "AmazonStoreConfig",
     "AppConfig",
+    "AppConfigSpec",
     "CacheConfig",
     "ClientMetricsConfig",
     "DatabaseConfig",
@@ -46,6 +54,8 @@ __all__ = [
     "WebPushConfig",
     "YahooStoreConfig",
     "load_app_config",
+    "load_app_config_for",
     "parse_app_config",
+    "parse_app_config_for",
     "warn_unknown_keys",
 ]

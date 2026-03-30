@@ -52,6 +52,42 @@ class BlueprintRegistration:
     url_prefix: str | None = None
 
 
+@dataclass(frozen=True)
+class OptionalBlueprintRegistration:
+    """Optional blueprint registration loaded lazily."""
+
+    loader: Callable[[], flask.Blueprint]
+    url_prefix: str | None = None
+    missing_exceptions: tuple[type[Exception], ...] = (ImportError,)
+    missing_message: str = "Optional blueprint not available, skipping registration"
+
+
+@dataclass(frozen=True)
+class PlatformAppSpec:
+    """Declarative specification for a price-platform Flask app."""
+
+    settings: WebAppSettings
+    common_routes: CommonRoutesSettings
+    healthcheck: Callable[[], object]
+    blueprints: tuple[BlueprintRegistration, ...] = field(default_factory=tuple)
+    optional_blueprints: tuple[OptionalBlueprintRegistration, ...] = field(default_factory=tuple)
+    route_installers: tuple[Callable[[flask.Flask], None], ...] = field(default_factory=tuple)
+    warmup: Callable[[], None] | None = None
+
+
+@dataclass(frozen=True)
+class SeoRoutesSpec:
+    """Declarative SEO route builders for sitemap and robots.txt."""
+
+    url_prefix: str
+    sitemap_builder: Callable[[], str]
+    robots_builder: Callable[[], str]
+    image_sitemap_builder: Callable[[], str] | None = None
+    sitemap_cache_max_age: int = 3600
+    robots_cache_max_age: int = 86400
+    image_sitemap_cache_max_age: int = 3600
+
+
 def configure_app(app: flask.Flask, settings: WebAppSettings) -> flask.Flask:
     """Apply shared webapp configuration to an existing Flask app."""
     if settings.enable_proxy_fix:
@@ -110,6 +146,23 @@ def register_blueprints(app: flask.Flask, registrations: tuple[BlueprintRegistra
     """Register multiple blueprints declaratively."""
     for registration in registrations:
         app.register_blueprint(registration.blueprint, url_prefix=registration.url_prefix)
+
+
+def register_optional_blueprints(
+    app: flask.Flask,
+    registrations: tuple[OptionalBlueprintRegistration, ...],
+    *,
+    logger: logging.Logger | None = None,
+) -> None:
+    """Register optional blueprints and skip expected missing modules."""
+    app_logger = logger or logging.getLogger(__name__)
+    for registration in registrations:
+        try:
+            blueprint = registration.loader()
+        except registration.missing_exceptions:
+            app_logger.info(registration.missing_message)
+            continue
+        app.register_blueprint(blueprint, url_prefix=registration.url_prefix)
 
 
 def install_common_routes(
@@ -186,3 +239,72 @@ def finalize_platform_app(
         app_logger.info("ウォームアップを開始します...")
         warmup()
         app_logger.info("ウォームアップ完了")
+
+
+def create_configured_platform_app(
+    spec: PlatformAppSpec,
+    *,
+    connection_getter: Callable[[], SupportsRequestConnection],
+    logger: logging.Logger | None = None,
+) -> flask.Flask:
+    """Create a fully configured platform app from a declarative spec."""
+    app = create_platform_app(
+        spec.settings,
+        connection_getter=connection_getter,
+        logger=logger,
+    )
+    install_common_routes(
+        app,
+        settings=spec.common_routes,
+        healthcheck=spec.healthcheck,
+        logger=logger,
+    )
+    register_blueprints(app, spec.blueprints)
+    register_optional_blueprints(app, spec.optional_blueprints, logger=logger)
+    for installer in spec.route_installers:
+        installer(app)
+    finalize_platform_app(app, logger=logger, warmup=spec.warmup)
+    return app
+
+
+def install_seo_routes(app: flask.Flask, spec: SeoRoutesSpec) -> None:
+    """Install standard sitemap.xml, robots.txt and image sitemap routes."""
+
+    @app.route(f"{spec.url_prefix}/sitemap.xml")
+    def sitemap() -> flask.Response:
+        response = flask.make_response(spec.sitemap_builder())
+        response.headers["Content-Type"] = "application/xml; charset=utf-8"
+        response.headers["Cache-Control"] = f"public, max-age={spec.sitemap_cache_max_age}"
+        return response
+
+    @app.route(f"{spec.url_prefix}/robots.txt")
+    def robots() -> flask.Response:
+        response = flask.make_response(spec.robots_builder())
+        response.headers["Content-Type"] = "text/plain; charset=utf-8"
+        response.headers["Cache-Control"] = f"public, max-age={spec.robots_cache_max_age}"
+        return response
+
+    if spec.image_sitemap_builder is None:
+        return
+
+    @app.route(f"{spec.url_prefix}/sitemap-images.xml")
+    def sitemap_images() -> flask.Response:
+        response = flask.make_response(spec.image_sitemap_builder())
+        response.headers["Content-Type"] = "application/xml; charset=utf-8"
+        response.headers["Cache-Control"] = f"public, max-age={spec.image_sitemap_cache_max_age}"
+        return response
+
+
+def create_warmup(*steps: Callable[[], object]) -> Callable[[], None]:
+    """Build a warmup callback from simple preload steps."""
+
+    def warmup() -> None:
+        for step in steps:
+            step()
+
+    return warmup
+
+
+def notify_content_update() -> None:
+    """Broadcast a content update event to SSE clients."""
+    my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.CONTENT)

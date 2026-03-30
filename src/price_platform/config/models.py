@@ -323,8 +323,8 @@ class AppConfig:
     client_metrics: ClientMetricsConfig = field(default_factory=ClientMetricsConfig)
     _base_dir: Path = field(default_factory=Path.cwd, repr=False)
 
-    def get_absolute_path(self, relative_path: str | Path) -> Path:
-        path = Path(relative_path)
+    def get_absolute_path(self, relative_path: Path) -> Path:
+        path = relative_path
         if path.is_absolute():
             return path
         return self._base_dir / path

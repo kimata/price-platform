@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import my_lib.sqlite_util
 import my_lib.time
@@ -21,6 +21,16 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
+
+
+class SupportsNotificationStoreConfig(Protocol):
+    """Protocol for app configs that expose notification store settings."""
+
+    notification: Any
+    schema_dir: pathlib.Path
+
+    def get_absolute_path(self, relative_path: pathlib.Path) -> pathlib.Path:
+        """Resolve a config-relative path."""
 
 
 class NotificationStatus(Enum):
@@ -503,6 +513,23 @@ class NotificationStore:
             conn.execute("DELETE FROM rate_limit_state WHERE id = 1")
             conn.commit()
             logger.debug("Cleared rate limit state")
+
+
+def open_notification_store(db_path: pathlib.Path, schema_dir: pathlib.Path) -> NotificationStore:
+    """Create a notification store without touching any global singleton."""
+    return NotificationStore(db_path, schema_dir)
+
+
+def open_existing_notification_store(config: SupportsNotificationStoreConfig) -> NotificationStore | None:
+    """Open the configured notification store only when it already exists."""
+    notification_config = getattr(config, "notification", None)
+    if notification_config is None or not notification_config.enabled:
+        return None
+
+    db_path = config.get_absolute_path(notification_config.db_path)
+    if not db_path.exists():
+        return None
+    return open_notification_store(db_path, config.schema_dir)
 
 
 # Global instance cache

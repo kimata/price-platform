@@ -22,8 +22,8 @@ class SecretStore(Protocol):
 class FileSecretStore:
     """Thread-safe file-backed secret store."""
 
-    def __init__(self, path: str | pathlib.Path):
-        self._path = pathlib.Path(path)
+    def __init__(self, path: pathlib.Path):
+        self._path = path
         self._lock = threading.Lock()
         self._cached_secret: str | None = None
 

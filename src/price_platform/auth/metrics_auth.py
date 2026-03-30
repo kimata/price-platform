@@ -6,7 +6,7 @@ import functools
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 import flask
 import jwt
@@ -26,6 +26,21 @@ class MetricsAuthSettings:
     password_hash: str = ""
     jwt_secret_path: Path = Path("data/jwt_secret.key")
     jwt_expiry_hours: int = 24
+
+
+@dataclass(frozen=True)
+class MetricsAuthFacade:
+    """Bound metrics auth helpers for a consumer application."""
+
+    settings_getter: Callable[[], MetricsAuthSettings]
+    require_auth: Callable[[Callable[..., Any]], Callable[..., Any]]
+    blueprint: flask.Blueprint
+
+
+class SupportsMetricsConfig(Protocol):
+    """Minimal protocol for config objects used by metrics auth helpers."""
+
+    metrics: Any
 
 
 def _utcnow() -> datetime:
@@ -164,3 +179,38 @@ def create_metrics_auth_blueprint(
         return flask.jsonify({"success": True}), 200
 
     return blueprint
+
+
+def build_metrics_auth_settings_getter(
+    *,
+    config_getter: Callable[[], SupportsMetricsConfig],
+) -> Callable[[], MetricsAuthSettings]:
+    """Build a settings getter for a consumer application's metrics auth facade."""
+
+    def settings_getter() -> MetricsAuthSettings:
+        auth = config_getter().metrics.auth
+        return MetricsAuthSettings(
+            enabled=auth.enabled,
+            password_hash=auth.password_hash,
+            jwt_secret_path=auth.jwt_secret_path,
+            jwt_expiry_hours=auth.jwt_expiry_hours,
+        )
+
+    return settings_getter
+
+
+def build_metrics_auth_facade(
+    *,
+    config_getter: Callable[[], SupportsMetricsConfig],
+    limiter: InMemoryRateLimiter | None = None,
+) -> MetricsAuthFacade:
+    """Build bound metrics auth helpers for a consumer application."""
+    settings_getter = build_metrics_auth_settings_getter(config_getter=config_getter)
+    return MetricsAuthFacade(
+        settings_getter=settings_getter,
+        require_auth=require_auth(settings_getter),
+        blueprint=create_metrics_auth_blueprint(
+            settings_getter=settings_getter,
+            limiter=limiter,
+        ),
+    )

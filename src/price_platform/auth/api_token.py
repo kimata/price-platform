@@ -7,12 +7,14 @@ import os
 import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable
+from pathlib import Path
+from typing import Any, Callable, Protocol
 
 import flask
 import jwt
 
 from ..webapp.cors import is_allowed_request_origin
+from ..webapp.cors import get_cors_origins
 from .secrets import FileSecretStore
 
 JWT_ALGORITHM = "HS256"
@@ -22,10 +24,27 @@ JWT_ALGORITHM = "HS256"
 class ApiTokenSettings:
     """Settings for short lived API tokens."""
 
-    secret_path: str = "data/api_token_secret.key"
+    secret_path: Path = Path("data/api_token_secret.key")
     expiry_sec: int = 180
     allowed_origins: tuple[str, ...] = field(default_factory=tuple)
     ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET"
+
+
+@dataclass(frozen=True)
+class ApiTokenFacade:
+    """Bound API token helpers for a consumer application."""
+
+    settings_getter: Callable[[], ApiTokenSettings]
+    generate_api_token: Callable[[], str]
+    verify_api_token: Callable[[str], dict[str, Any] | None]
+    require_api_token: Callable[[Callable[..., Any]], Callable[..., Any]]
+    blueprint: flask.Blueprint
+
+
+class SupportsWebappConfig(Protocol):
+    """Minimal protocol for config objects used by API token helpers."""
+
+    webapp: Any
 
 
 def _utcnow() -> datetime:
@@ -131,3 +150,59 @@ def create_api_token_blueprint(
         return flask.jsonify({"token": token, "expires_in": settings.expiry_sec}), 200
 
     return blueprint
+
+
+def build_api_token_settings_getter(
+    *,
+    config_getter: Callable[[], SupportsWebappConfig],
+    secret_path: Path,
+    expiry_sec: int = 180,
+    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET",
+) -> Callable[[], ApiTokenSettings]:
+    """Build a settings getter for a consumer application's API token facade."""
+
+    def settings_getter() -> ApiTokenSettings:
+        try:
+            config = config_getter()
+            external_url = config.webapp.external_url
+            allowed_origins = tuple(get_cors_origins(external_url)) if external_url else ()
+        except (FileNotFoundError, ValueError):
+            allowed_origins = ()
+        return ApiTokenSettings(
+            secret_path=secret_path,
+            expiry_sec=expiry_sec,
+            allowed_origins=allowed_origins,
+            ssr_internal_secret_env=ssr_internal_secret_env,
+        )
+
+    return settings_getter
+
+
+def build_api_token_facade(
+    *,
+    config_getter: Callable[[], SupportsWebappConfig],
+    secret_path: Path,
+    expiry_sec: int = 180,
+    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET",
+) -> ApiTokenFacade:
+    """Build bound API token helpers for a consumer application."""
+    settings_getter = build_api_token_settings_getter(
+        config_getter=config_getter,
+        secret_path=secret_path,
+        expiry_sec=expiry_sec,
+        ssr_internal_secret_env=ssr_internal_secret_env,
+    )
+
+    def generate_bound_token() -> str:
+        return generate_api_token(settings_getter())
+
+    def verify_bound_token(token: str) -> dict[str, Any] | None:
+        return verify_api_token(token, settings_getter())
+
+    return ApiTokenFacade(
+        settings_getter=settings_getter,
+        generate_api_token=generate_bound_token,
+        verify_api_token=verify_bound_token,
+        require_api_token=require_api_token(settings_getter),
+        blueprint=create_api_token_blueprint(settings_getter=settings_getter),
+    )

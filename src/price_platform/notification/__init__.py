@@ -11,6 +11,8 @@ from .notification_store import (
     RateLimitState,
     get_notification_store,
     init_notification_store,
+    open_existing_notification_store,
+    open_notification_store,
 )
 from .twitter_poster import (
     TwitterConfig,
@@ -28,4 +30,6 @@ __all__ = [
     "TwitterRateLimit",
     "get_notification_store",
     "init_notification_store",
+    "open_existing_notification_store",
+    "open_notification_store",
 ]

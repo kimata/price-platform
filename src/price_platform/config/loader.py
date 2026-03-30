@@ -5,8 +5,9 @@ from __future__ import annotations
 import difflib
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import my_lib.config
 
@@ -22,9 +23,11 @@ from .models import (
     SeleniumConfig,
     StoreConfig,
     WebAppConfig,
+    _resolve_path,
 )
 
 logger = logging.getLogger(__name__)
+ConfigT = TypeVar("ConfigT", bound=AppConfig)
 
 REQUIRED_SECTIONS = (
     "scrape",
@@ -40,6 +43,14 @@ REQUIRED_SECTIONS = (
 OPTIONAL_SECTIONS = ("notification", "client_metrics")
 
 
+@dataclass(frozen=True)
+class AppConfigSpec:
+    """Application-specific knobs for loading shared config."""
+
+    env_var_name: str
+    default_liveness_file: Path
+
+
 def warn_unknown_keys(data: dict[str, Any], known_keys: set[str], section_name: str) -> None:
     """Warn about unknown keys in config data."""
     unknown = set(data.keys()) - known_keys
@@ -50,15 +61,32 @@ def warn_unknown_keys(data: dict[str, Any], known_keys: set[str], section_name: 
 
 
 def load_app_config(
-    config_cls: type[AppConfig],
+    config_cls: type[ConfigT],
     *,
     env_var_name: str,
     default_liveness_file: Path,
     config_path: str | Path | None = None,
-) -> AppConfig:
+) -> ConfigT:
     """Load shared app config from YAML."""
+    return load_app_config_for(
+        config_cls,
+        AppConfigSpec(
+            env_var_name=env_var_name,
+            default_liveness_file=default_liveness_file,
+        ),
+        config_path=config_path,
+    )
+
+
+def load_app_config_for(
+    config_cls: type[ConfigT],
+    spec: AppConfigSpec,
+    *,
+    config_path: str | Path | None = None,
+) -> ConfigT:
+    """Load shared app config using an application-specific spec."""
     if config_path is None:
-        config_path = os.environ.get(env_var_name, "config.yaml")
+        config_path = os.environ.get(spec.env_var_name, "config.yaml")
 
     try:
         data = my_lib.config.load(config_path)
@@ -71,22 +99,41 @@ def load_app_config(
         raise ValueError(msg)
 
     base_dir = Path(config_path).absolute().parent
-    return parse_app_config(
+    return parse_app_config_for(
         config_cls,
+        spec,
         data,
         base_dir=base_dir,
-        default_liveness_file=default_liveness_file,
     )
 
 
 def parse_app_config(
-    config_cls: type[AppConfig],
+    config_cls: type[ConfigT],
     data: dict[str, Any],
     *,
     default_liveness_file: Path,
     base_dir: Path | None = None,
-) -> AppConfig:
+) -> ConfigT:
     """Build shared app config from dict."""
+    return parse_app_config_for(
+        config_cls,
+        AppConfigSpec(
+            env_var_name="",
+            default_liveness_file=default_liveness_file,
+        ),
+        data,
+        base_dir=base_dir,
+    )
+
+
+def parse_app_config_for(
+    config_cls: type[ConfigT],
+    spec: AppConfigSpec,
+    data: dict[str, Any],
+    *,
+    base_dir: Path | None = None,
+) -> ConfigT:
+    """Build shared app config from dict using an application-specific spec."""
     for section in REQUIRED_SECTIONS:
         if section not in data:
             msg = f"{section} configuration is required"
@@ -110,8 +157,8 @@ def parse_app_config(
         database=DatabaseConfig.parse(data["database"], base_dir=base_dir),
         webapp=webapp,
         metrics=MetricsConfig.parse(data["metrics"], base_dir=base_dir),
-        liveness=LivenessConfig.parse(data["liveness"], default_file=default_liveness_file, base_dir=base_dir),
-        product_catalog_path=Path(data["product_catalog_path"]),
+        liveness=LivenessConfig.parse(data["liveness"], default_file=spec.default_liveness_file, base_dir=base_dir),
+        product_catalog_path=_resolve_path(data["product_catalog_path"], base_dir=base_dir),
         cache=CacheConfig.parse(data["cache"], base_dir=base_dir),
         notification=NotificationConfig.parse(data.get("notification"), base_dir=base_dir),
         client_metrics=ClientMetricsConfig.parse(data.get("client_metrics"), base_dir=base_dir),
