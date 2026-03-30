@@ -147,7 +147,7 @@ class DatabaseConfig:
 
 @dataclass(frozen=True)
 class WebAppDataConfig:
-    """Optional runtime data paths for web applications."""
+    """Runtime data paths for web applications."""
 
     schedule_file_path: Path | None = None
     log_file_path: Path | None = None
