@@ -39,9 +39,10 @@ def managed_crawl_runtime(
     enable_notification: bool,
     init_notification_manager: Callable[[], NotificationManagerT],
     clear_notification_manager: Callable[[NotificationManagerT | None], None],
+    lifecycle_manager: LifecycleManager | None = None,
 ) -> Iterator[CrawlRuntime[NotificationManagerT]]:
     """Create and clean up per-run managers for a crawl session."""
-    lifecycle_manager = LifecycleManager()
+    lifecycle_manager = lifecycle_manager or LifecycleManager()
     liveness_manager = LivenessManager(
         liveness_file=liveness_file,
         update_interval_sec=liveness_update_interval_sec,

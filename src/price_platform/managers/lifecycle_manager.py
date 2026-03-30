@@ -1,7 +1,4 @@
-"""Lifecycle manager for price-platform applications.
-
-Provides thread-safe shutdown management using threading.Event.
-"""
+"""Lifecycle manager for price-platform applications."""
 
 from __future__ import annotations
 
@@ -74,77 +71,3 @@ class LifecycleManager:
         """
         return self._shutdown_event.wait(timeout)
 
-
-# Global lifecycle manager instance
-_lifecycle_manager: LifecycleManager | None = None
-
-
-def get_lifecycle_manager() -> LifecycleManager | None:
-    """Get the global lifecycle manager instance.
-
-    Returns:
-        The lifecycle manager instance, or None if not initialized.
-    """
-    return _lifecycle_manager
-
-
-def set_lifecycle_manager(manager: LifecycleManager | None) -> None:
-    """Set the global lifecycle manager instance.
-
-    Args:
-        manager: The lifecycle manager to set, or None to clear.
-    """
-    global _lifecycle_manager
-    _lifecycle_manager = manager
-
-
-def init_lifecycle_manager() -> LifecycleManager:
-    """Initialize and return a new lifecycle manager.
-
-    This creates a new LifecycleManager instance and sets it as the
-    global instance.
-
-    Returns:
-        The newly created lifecycle manager.
-    """
-    manager = LifecycleManager()
-    set_lifecycle_manager(manager)
-    return manager
-
-
-def request_shutdown(exit_reason: str = "shutdown") -> None:
-    """Request shutdown via the global lifecycle manager."""
-    manager = get_lifecycle_manager()
-    if manager is None:
-        raise RuntimeError("LifecycleManager not initialized")
-    manager.request_shutdown(exit_reason)
-
-
-def is_shutdown_requested() -> bool:
-    """Return whether shutdown has been requested."""
-    manager = get_lifecycle_manager()
-    if manager is None:
-        return False
-    return manager.is_shutdown_requested()
-
-
-def get_exit_reason() -> str | None:
-    """Return the current shutdown reason, if any."""
-    manager = get_lifecycle_manager()
-    if manager is None:
-        return None
-    return manager.get_exit_reason()
-
-
-def reset_shutdown() -> None:
-    """Reset shutdown state on the global lifecycle manager."""
-    manager = get_lifecycle_manager()
-    if manager is None:
-        return
-    manager.reset()
-
-
-def _reset_lifecycle_manager() -> None:
-    """Reset lifecycle manager for testing."""
-    global _lifecycle_manager
-    _lifecycle_manager = None

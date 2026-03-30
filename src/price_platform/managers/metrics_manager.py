@@ -405,16 +405,3 @@ class MetricsManager:
             },
         }
 
-
-_manager: MetricsManager | None = None
-
-
-def get_metrics_manager() -> MetricsManager | None:
-    """Get global metrics manager instance (may be None if not enabled)."""
-    return _manager
-
-
-def set_metrics_manager(manager: MetricsManager | None) -> None:
-    """Set global metrics manager instance."""
-    global _manager
-    _manager = manager
