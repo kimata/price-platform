@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from my_lib.store.amazon.credentials import AmazonApiConfig as AmazonStoreConfig
+from my_lib.store.rakuten.credentials import RakutenApiConfig as RakutenStoreConfig
+from my_lib.store.yahoo.credentials import YahooApiConfig as YahooStoreConfig
+
 
 def _resolve_path(value: str | Path, *, base_dir: Path) -> Path:
     path = Path(value)
@@ -25,59 +29,6 @@ class MercariConfig:
         if data is None:
             return cls()
         return cls(**data)
-
-
-@dataclass(frozen=True)
-class AmazonStoreConfig:
-    """Amazon API configuration."""
-
-    credential_id: str
-    credential_secret: str
-    associate: str
-    version: str = "3.3"
-
-    @classmethod
-    def parse(cls, data: dict[str, Any]) -> AmazonStoreConfig:
-        return cls(
-            credential_id=data["credential_id"],
-            credential_secret=data["credential_secret"],
-            associate=data["associate"],
-            version=data.get("version", "3.3"),
-        )
-
-
-@dataclass(frozen=True)
-class YahooStoreConfig:
-    """Yahoo! Shopping API configuration."""
-
-    client_id: str
-    secret: str
-    affiliate_type: str | None = None
-    affiliate_id: str | None = None
-
-    @classmethod
-    def parse(cls, data: dict[str, Any]) -> YahooStoreConfig:
-        return cls(
-            client_id=data["client_id"],
-            secret=data["secret"],
-            affiliate_type=data.get("affiliate_type"),
-            affiliate_id=data.get("affiliate_id"),
-        )
-
-
-@dataclass(frozen=True)
-class RakutenStoreConfig:
-    """Rakuten API configuration."""
-
-    application_id: str
-    affiliate_id: str | None = None
-
-    @classmethod
-    def parse(cls, data: dict[str, Any]) -> RakutenStoreConfig:
-        return cls(
-            application_id=data["application_id"],
-            affiliate_id=data.get("affiliate_id"),
-        )
 
 
 @dataclass(frozen=True)

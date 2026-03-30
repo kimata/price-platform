@@ -88,6 +88,8 @@ class MetricsDBProtocol(Protocol):
 
     def increment_round_count(self, session_id: int) -> int: ...
 
+    def cleanup_old_records(self, days: int = 365) -> int: ...
+
 
 @dataclass
 class StoreMetricsAccumulator:

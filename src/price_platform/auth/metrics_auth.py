@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable
 
 import flask
@@ -23,7 +24,7 @@ class MetricsAuthSettings:
 
     enabled: bool = False
     password_hash: str = ""
-    jwt_secret_path: str = "data/jwt_secret.key"
+    jwt_secret_path: Path = Path("data/jwt_secret.key")
     jwt_expiry_hours: int = 24
 
 
