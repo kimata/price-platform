@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 import my_lib.config
-import my_lib.webapp.config
 
 from .models import (
     AppConfig,
@@ -22,6 +21,7 @@ from .models import (
     ScrapeConfig,
     SeleniumConfig,
     StoreConfig,
+    WebAppConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,8 +66,8 @@ def load_app_config(
         msg = f"Configuration file not found: {config_path}"
         raise FileNotFoundError(msg) from exc
 
-    if data is None:
-        msg = "scrape configuration is required"
+    if not isinstance(data, dict):
+        msg = "Configuration must be a mapping"
         raise ValueError(msg)
 
     base_dir = Path(config_path).absolute().parent
@@ -95,25 +95,25 @@ def parse_app_config(
     known_sections = set(REQUIRED_SECTIONS) | set(OPTIONAL_SECTIONS)
     warn_unknown_keys(data, known_sections, "config")
 
-    webapp = my_lib.webapp.config.WebappConfig.parse(data["webapp"])
-    if webapp.external_url is None:
-        msg = "webapp.external_url is required for CORS configuration"
-        raise ValueError(msg)
-
     if base_dir is None:
         base_dir = Path.cwd()
+
+    webapp = WebAppConfig.parse(data["webapp"], base_dir=base_dir)
+    if not webapp.external_url:
+        msg = "webapp.external_url is required for CORS configuration"
+        raise ValueError(msg)
 
     return config_cls(
         scrape=ScrapeConfig.parse(data["scrape"]),
         store=StoreConfig.parse(data["store"]),
-        selenium=SeleniumConfig(**data["selenium"]),
-        database=DatabaseConfig(**data["database"]),
+        selenium=SeleniumConfig.parse(data["selenium"], base_dir=base_dir),
+        database=DatabaseConfig.parse(data["database"], base_dir=base_dir),
         webapp=webapp,
-        metrics=MetricsConfig.parse(data["metrics"]),
-        liveness=LivenessConfig.parse(data["liveness"], default_file=default_liveness_file),
-        product_catalog_path=data["product_catalog_path"],
-        cache=CacheConfig.parse(data["cache"]),
-        notification=NotificationConfig.parse(data.get("notification")),
-        client_metrics=ClientMetricsConfig.parse(data.get("client_metrics")),
+        metrics=MetricsConfig.parse(data["metrics"], base_dir=base_dir),
+        liveness=LivenessConfig.parse(data["liveness"], default_file=default_liveness_file, base_dir=base_dir),
+        product_catalog_path=Path(data["product_catalog_path"]),
+        cache=CacheConfig.parse(data["cache"], base_dir=base_dir),
+        notification=NotificationConfig.parse(data.get("notification"), base_dir=base_dir),
+        client_metrics=ClientMetricsConfig.parse(data.get("client_metrics"), base_dir=base_dir),
         _base_dir=base_dir,
     )

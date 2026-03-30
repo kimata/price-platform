@@ -77,6 +77,11 @@ class InMemoryRateLimiter:
 
             return max(0, int(lockout_until - self._now_fn()))
 
+    def clear_failures(self, ip: str) -> None:
+        with self._state.lock:
+            self._state.failures.pop(ip, None)
+            self._state.lockouts.pop(ip, None)
+
     def clear_state(self) -> None:
         with self._state.lock:
             self._state.failures.clear()

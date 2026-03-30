@@ -13,7 +13,7 @@ import flask
 import jwt
 
 from ..webapp.cors import is_allowed_request_origin
-from .secrets import FileSecretProvider
+from .secrets import FileSecretStore
 
 JWT_ALGORITHM = "HS256"
 
@@ -39,7 +39,7 @@ def _get_ssr_internal_secret(env_var: str) -> str | None:
 
 def generate_api_token(settings: ApiTokenSettings) -> str:
     """Generate a short lived API JWT."""
-    secret = FileSecretProvider(settings.secret_path).get_secret()
+    secret = FileSecretStore(settings.secret_path).ensure()
     now = _utcnow()
     exp = now + timedelta(seconds=settings.expiry_sec)
     payload = {"type": "api", "iat": int(now.timestamp()), "exp": int(exp.timestamp())}
@@ -48,7 +48,10 @@ def generate_api_token(settings: ApiTokenSettings) -> str:
 
 def verify_api_token(token: str, settings: ApiTokenSettings) -> dict[str, Any] | None:
     """Verify a short lived API JWT."""
-    secret = FileSecretProvider(settings.secret_path).get_secret()
+    try:
+        secret = FileSecretStore(settings.secret_path).load()
+    except FileNotFoundError:
+        return None
     try:
         payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
         if payload.get("type") != "api":

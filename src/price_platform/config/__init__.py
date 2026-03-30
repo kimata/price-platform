@@ -2,6 +2,7 @@
 
 from .loader import load_app_config, parse_app_config, warn_unknown_keys
 from .models import (
+    AmazonStoreConfig,
     AppConfig,
     CacheConfig,
     ClientMetricsConfig,
@@ -12,14 +13,19 @@ from .models import (
     MetricsAuthConfig,
     MetricsConfig,
     NotificationConfig,
+    RakutenStoreConfig,
     ScrapeConfig,
     SeleniumConfig,
     StoreConfig,
     TwitterConfig,
+    WebAppConfig,
+    WebAppDataConfig,
     WebPushConfig,
+    YahooStoreConfig,
 )
 
 __all__ = [
+    "AmazonStoreConfig",
     "AppConfig",
     "CacheConfig",
     "ClientMetricsConfig",
@@ -30,11 +36,15 @@ __all__ = [
     "MetricsAuthConfig",
     "MetricsConfig",
     "NotificationConfig",
+    "RakutenStoreConfig",
     "ScrapeConfig",
     "SeleniumConfig",
     "StoreConfig",
     "TwitterConfig",
+    "WebAppConfig",
+    "WebAppDataConfig",
     "WebPushConfig",
+    "YahooStoreConfig",
     "load_app_config",
     "parse_app_config",
     "warn_unknown_keys",

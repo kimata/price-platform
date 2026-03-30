@@ -12,7 +12,7 @@ import jwt
 
 from .password_hash import verify_password
 from .rate_limiter import InMemoryRateLimiter
-from .secrets import FileSecretProvider
+from .secrets import FileSecretStore
 
 JWT_ALGORITHM = "HS256"
 
@@ -37,7 +37,7 @@ def _get_client_ip() -> str:
 
 def issue_auth_token(settings: MetricsAuthSettings) -> str:
     """Issue a metrics JWT token."""
-    secret = FileSecretProvider(settings.jwt_secret_path).get_secret()
+    secret = FileSecretStore(settings.jwt_secret_path).ensure()
     now = _utcnow()
     exp = now + timedelta(hours=settings.jwt_expiry_hours)
     payload = {
@@ -50,7 +50,10 @@ def issue_auth_token(settings: MetricsAuthSettings) -> str:
 
 def verify_auth_token(token: str, settings: MetricsAuthSettings) -> dict[str, Any] | None:
     """Verify a metrics JWT token."""
-    secret = FileSecretProvider(settings.jwt_secret_path).get_secret()
+    try:
+        secret = FileSecretStore(settings.jwt_secret_path).load()
+    except FileNotFoundError:
+        return None
     try:
         payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
         return dict(payload)
@@ -133,6 +136,7 @@ def create_metrics_auth_blueprint(
                 ), 429
             return flask.jsonify({"error": "Invalid credentials", "code": "INVALID_CREDENTIALS"}), 401
 
+        rate_limiter.clear_failures(client_ip)
         token = issue_auth_token(settings)
         return flask.jsonify({"token": token, "expires_in": settings.jwt_expiry_hours * 3600}), 200
 
