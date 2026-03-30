@@ -4,6 +4,7 @@ Provides shared lifecycle, liveness, and metrics management
 for crawl-based price tracking applications.
 """
 
+from .crawl_runtime import CrawlRuntime, managed_crawl_runtime
 from .lifecycle_manager import (
     LifecycleManager,
     get_exit_reason,
@@ -32,6 +33,7 @@ __all__ = [
     "LivenessManager",
     "MetricsDBProtocol",
     "MetricsManager",
+    "CrawlRuntime",
     "get_exit_reason",
     "get_lifecycle_manager",
     "get_liveness_manager",
@@ -39,6 +41,7 @@ __all__ = [
     "init_lifecycle_manager",
     "init_liveness_manager",
     "is_shutdown_requested",
+    "managed_crawl_runtime",
     "request_shutdown",
     "reset_shutdown",
     "set_lifecycle_manager",
