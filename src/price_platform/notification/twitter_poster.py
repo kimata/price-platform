@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import my_lib.time
 
+from ..config.models import TwitterConfig
 from .notification_store import NotificationItem, NotificationStore
 
 # Interval to suppress duplicate postings for the same product (24 hours)
@@ -69,18 +70,6 @@ class TwitterRateLimit:
         """Seconds to wait until the rate limit resets."""
         delta = self.next_reset - my_lib.time.now()
         return max(0, int(delta.total_seconds())) + 60  # +60s margin
-
-
-@dataclass(frozen=True)
-class TwitterConfig:
-    """Twitter API configuration."""
-
-    enabled: bool
-    api_key: str
-    api_secret: str
-    access_token: str
-    access_token_secret: str
-    post_interval_sec: int = 300  # Default: 5 minutes
 
 
 class TwitterPoster:

@@ -377,6 +377,14 @@ class MetricsManager:
                 total_duration_sec=acc.total_duration_sec,
             )
 
+    def cleanup_old_records(self, days: int = 365) -> int:
+        """Remove metrics records older than *days* days.
+
+        Returns:
+            Number of records deleted.
+        """
+        return self._db.cleanup_old_records(days=days)
+
     def get_session_summary(self) -> dict[str, Any]:
         """Get current session summary for logging."""
         return {

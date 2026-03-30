@@ -43,10 +43,6 @@ class SupportsMetricsConfig(Protocol):
     metrics: Any
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _get_client_ip() -> str:
     return flask.request.remote_addr or "unknown"
 
@@ -54,7 +50,7 @@ def _get_client_ip() -> str:
 def issue_auth_token(settings: MetricsAuthSettings) -> str:
     """Issue a metrics JWT token."""
     secret = FileSecretStore(settings.jwt_secret_path).ensure()
-    now = _utcnow()
+    now = datetime.now(timezone.utc)
     exp = now + timedelta(hours=settings.jwt_expiry_hours)
     payload = {
         "sub": "user",

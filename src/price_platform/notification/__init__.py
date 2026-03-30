@@ -4,6 +4,7 @@ Provides shared notification queue persistence and Twitter posting
 for crawl-based price tracking applications.
 """
 
+from ..config.models import TwitterConfig
 from .notification_store import (
     NotificationItem,
     NotificationStatus,
@@ -15,7 +16,6 @@ from .notification_store import (
     open_notification_store,
 )
 from .twitter_poster import (
-    TwitterConfig,
     TwitterPoster,
     TwitterRateLimit,
 )

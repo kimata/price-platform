@@ -13,8 +13,7 @@ from typing import Any, Callable, Protocol
 import flask
 import jwt
 
-from ..webapp.cors import is_allowed_request_origin
-from ..webapp.cors import get_cors_origins
+from ..webapp.cors import get_cors_origins, is_allowed_request_origin
 from .secrets import FileSecretStore
 
 JWT_ALGORITHM = "HS256"
@@ -47,10 +46,6 @@ class SupportsWebappConfig(Protocol):
     webapp: Any
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _get_ssr_internal_secret(env_var: str) -> str | None:
     secret = os.environ.get(env_var, "")
     return secret or None
@@ -59,7 +54,7 @@ def _get_ssr_internal_secret(env_var: str) -> str | None:
 def generate_api_token(settings: ApiTokenSettings) -> str:
     """Generate a short lived API JWT."""
     secret = FileSecretStore(settings.secret_path).ensure()
-    now = _utcnow()
+    now = datetime.now(timezone.utc)
     exp = now + timedelta(seconds=settings.expiry_sec)
     payload = {"type": "api", "iat": int(now.timestamp()), "exp": int(exp.timestamp())}
     return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
