@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, TypeVar, cast
+from typing import Callable, Generic, TypeVar, cast
 
 import flask
 
@@ -15,16 +15,76 @@ MetricsDbT = TypeVar("MetricsDbT")
 ClientMetricsDbT = TypeVar("ClientMetricsDbT")
 NotificationStoreT = TypeVar("NotificationStoreT")
 WebPushStoreT = TypeVar("WebPushStoreT")
+ServiceT = TypeVar("ServiceT")
+
+
+def _get_request_service_cache() -> dict[str, object]:
+    cache = getattr(flask.g, "_app_service_cache", None)
+    if cache is None:
+        cache = {}
+        flask.g._app_service_cache = cache
+    return cast(dict[str, object], cache)
+
+
+def _resolve_service(
+    name: str,
+    service: ServiceT | None,
+    factory: Callable[[], ServiceT | None] | None,
+) -> ServiceT | None:
+    if service is not None:
+        return service
+    if factory is None:
+        return None
+    if not flask.has_request_context():
+        return factory()
+
+    cache = _get_request_service_cache()
+    if name not in cache:
+        cache[name] = factory()
+    return cast(ServiceT | None, cache[name])
+
+
+def _validate_service_source(name: str, service: object | None, factory: Callable[[], object | None] | None) -> None:
+    if service is not None and factory is not None:
+        raise ValueError(f"{name} and {name}_factory cannot both be provided")
 
 
 @dataclass(frozen=True)
 class AppServices(Generic[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]):
-    """Optional long-lived services used by Web APIs."""
+    """Optional service accessors used by Web APIs."""
 
-    metrics_db: MetricsDbT | None = None
-    client_metrics_db: ClientMetricsDbT | None = None
-    notification_store: NotificationStoreT | None = None
-    webpush_store: WebPushStoreT | None = None
+    _metrics_db: MetricsDbT | None = None
+    _metrics_db_factory: Callable[[], MetricsDbT | None] | None = None
+    _client_metrics_db: ClientMetricsDbT | None = None
+    _client_metrics_db_factory: Callable[[], ClientMetricsDbT | None] | None = None
+    _notification_store: NotificationStoreT | None = None
+    _notification_store_factory: Callable[[], NotificationStoreT | None] | None = None
+    _webpush_store: WebPushStoreT | None = None
+    _webpush_store_factory: Callable[[], WebPushStoreT | None] | None = None
+
+    @property
+    def metrics_db(self) -> MetricsDbT | None:
+        return _resolve_service("metrics_db", self._metrics_db, self._metrics_db_factory)
+
+    @property
+    def client_metrics_db(self) -> ClientMetricsDbT | None:
+        return _resolve_service(
+            "client_metrics_db",
+            self._client_metrics_db,
+            self._client_metrics_db_factory,
+        )
+
+    @property
+    def notification_store(self) -> NotificationStoreT | None:
+        return _resolve_service(
+            "notification_store",
+            self._notification_store,
+            self._notification_store_factory,
+        )
+
+    @property
+    def webpush_store(self) -> WebPushStoreT | None:
+        return _resolve_service("webpush_store", self._webpush_store, self._webpush_store_factory)
 
 
 @dataclass(frozen=True)
@@ -39,16 +99,29 @@ class AppDependencies(Generic[ConfigT, StoresT, ServicesT]):
 def build_app_services(
     *,
     metrics_db: MetricsDbT | None = None,
+    metrics_db_factory: Callable[[], MetricsDbT | None] | None = None,
     client_metrics_db: ClientMetricsDbT | None = None,
+    client_metrics_db_factory: Callable[[], ClientMetricsDbT | None] | None = None,
     notification_store: NotificationStoreT | None = None,
+    notification_store_factory: Callable[[], NotificationStoreT | None] | None = None,
     webpush_store: WebPushStoreT | None = None,
+    webpush_store_factory: Callable[[], WebPushStoreT | None] | None = None,
 ) -> AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]:
     """Build an AppServices bundle."""
+    _validate_service_source("metrics_db", metrics_db, metrics_db_factory)
+    _validate_service_source("client_metrics_db", client_metrics_db, client_metrics_db_factory)
+    _validate_service_source("notification_store", notification_store, notification_store_factory)
+    _validate_service_source("webpush_store", webpush_store, webpush_store_factory)
+
     return AppServices(
-        metrics_db=metrics_db,
-        client_metrics_db=client_metrics_db,
-        notification_store=notification_store,
-        webpush_store=webpush_store,
+        _metrics_db=metrics_db,
+        _metrics_db_factory=metrics_db_factory,
+        _client_metrics_db=client_metrics_db,
+        _client_metrics_db_factory=client_metrics_db_factory,
+        _notification_store=notification_store,
+        _notification_store_factory=notification_store_factory,
+        _webpush_store=webpush_store,
+        _webpush_store_factory=webpush_store_factory,
     )
 
 

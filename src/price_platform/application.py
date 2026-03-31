@@ -53,9 +53,8 @@ def build_app_services(
 ) -> price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]:
     """Build an AppServices bundle from service factories."""
     return price_platform.webapp.build_app_services(
-        metrics_db=factories.metrics_db_factory(config),
-        client_metrics_db=factories.client_metrics_db_factory(config),
-        notification_store=factories.notification_store_factory(config),
-        webpush_store=factories.webpush_store_factory(config),
+        metrics_db_factory=lambda: factories.metrics_db_factory(config),
+        client_metrics_db_factory=lambda: factories.client_metrics_db_factory(config),
+        notification_store_factory=lambda: factories.notification_store_factory(config),
+        webpush_store_factory=lambda: factories.webpush_store_factory(config),
     )
-
