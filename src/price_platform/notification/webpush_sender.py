@@ -28,14 +28,6 @@ class SubscriptionProtocol(Protocol):
     auth_key: str
 
 
-class DeliveryStatusProtocol(Protocol):
-    """Enum-like delivery status surface required by the sender."""
-
-    SENT: Any
-    FAILED: Any
-    EXPIRED: Any
-
-
 class WebPushStoreProtocol(Protocol[SubscriptionT]):
     """Store operations required by the sender."""
 
@@ -58,6 +50,14 @@ class WebPushStoreProtocol(Protocol[SubscriptionT]):
         status: Any,
         error_message: str | None = None,
     ) -> int: ...
+
+
+class DeliveryStatusProtocol(Protocol):
+    """Enum-like delivery status surface required by the sender."""
+
+    SENT: Any
+    FAILED: Any
+    EXPIRED: Any
 
 
 def build_detail_url(base_url: str, product_id: str, selection_key: str | None = None) -> str:

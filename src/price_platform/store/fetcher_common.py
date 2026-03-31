@@ -10,7 +10,7 @@ import time
 import unicodedata
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
 
 import requests
 from bs4 import BeautifulSoup
@@ -25,6 +25,23 @@ logger = logging.getLogger(__name__)
 
 ProductT = TypeVar("ProductT")
 ScrapedPriceT = TypeVar("ScrapedPriceT")
+
+
+class _SeleniumConfigLike(Protocol):
+    @property
+    def data_path(self) -> pathlib.Path: ...
+    @property
+    def headless(self) -> bool: ...
+
+
+class FetcherConfigProtocol(Protocol):
+    """Minimal config surface required by SharedBaseFetcher."""
+
+    @property
+    def selenium(self) -> _SeleniumConfigLike: ...
+
+
+ConfigT = TypeVar("ConfigT", bound=FetcherConfigProtocol)
 
 
 @dataclass(frozen=True)
@@ -207,14 +224,14 @@ def filter_by_color_label(
     return filtered
 
 
-class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT]):
+class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT]):
     """Shared HTTP/WebDriver fetcher base."""
 
     store_type: object
     MAX_SEARCH_RESULTS = 20
 
-    def __init__(self, config: object, *, webdriver_profile_name: str):
-        self.config = config
+    def __init__(self, config: ConfigT, *, webdriver_profile_name: str) -> None:
+        self.config: ConfigT = config
         self._webdriver_profile_name = webdriver_profile_name
         self.session = requests.Session()
         self.session.headers.update(

@@ -27,10 +27,13 @@ class SupportsNotificationStoreConfig(Protocol):
     """Protocol for app configs that expose notification store settings."""
 
     notification: Any
-    schema_dir: pathlib.Path
+
+    @property
+    def schema_dir(self) -> pathlib.Path: ...
 
     def get_absolute_path(self, relative_path: pathlib.Path) -> pathlib.Path:
         """Resolve a config-relative path."""
+        ...
 
 
 class NotificationStatus(Enum):

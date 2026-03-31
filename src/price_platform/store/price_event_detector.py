@@ -21,17 +21,23 @@ SoldRecordT = TypeVar("SoldRecordT", bound="SoldRecordProtocol")
 class PriceRecordProtocol(Protocol[StoreTypeT]):
     """Minimal price-record surface required by the detector."""
 
-    price: int
-    is_used: bool
-    store: StoreTypeT
-    url: str
-    recorded_at: datetime
+    @property
+    def price(self) -> int: ...
+    @property
+    def is_used(self) -> bool: ...
+    @property
+    def store(self) -> StoreTypeT: ...
+    @property
+    def url(self) -> str | None: ...
+    @property
+    def recorded_at(self) -> datetime: ...
 
 
 class SoldRecordProtocol(Protocol):
     """Minimal sold-record surface required by the detector."""
 
-    price: int
+    @property
+    def price(self) -> int: ...
 
 
 class PriceStoreProtocol(Protocol[PriceRecordT, SoldRecordT]):
@@ -39,9 +45,9 @@ class PriceStoreProtocol(Protocol[PriceRecordT, SoldRecordT]):
 
     def get_price_history(self, product_id: str, days: int) -> list[PriceRecordT]: ...
 
-    def get_lowest_price(self, product_id: str, is_used: bool) -> PriceRecordT | None: ...
+    def get_lowest_price(self, product_id: str, *, is_used: bool) -> PriceRecordT | None: ...
 
-    def get_sold_records(self, product_id: str, limit: int = 20) -> list[SoldRecordT]: ...
+    def get_sold_records(self, product_id: str, *, limit: int = 20) -> list[SoldRecordT]: ...
 
     def get_current_prices(self, product_id: str) -> list[PriceRecordT]: ...
 
@@ -54,16 +60,15 @@ class PriceEventStoreProtocol(Protocol[PriceEventT]):
         product_id: str,
         store: Any,
         price: int,
-        *,
-        days: int,
-        tolerance: int,
+        days: int = 14,
+        tolerance: int = 100,
     ) -> bool: ...
 
     def get_recent_event_for_product(self, product_id: str, hours: int) -> PriceEventT | None: ...
 
     def save_event(self, event: PriceEventT) -> int: ...
 
-    def suppress_event(self, event_id: int, suppressor_id: int) -> None: ...
+    def suppress_event(self, event_id: int, superseded_by: int) -> None: ...
 
 
 @dataclass
