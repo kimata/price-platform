@@ -6,7 +6,18 @@ import pathlib
 import sqlite3
 from typing import TYPE_CHECKING
 
-from ._metrics_sqlite_models import LockingMode
+from ._metrics_sqlite_models import (
+    HEARTBEAT_TIMEOUT_SEC,
+    AmazonBatchStats,
+    CrawlSession,
+    CycleStats,
+    HeatmapEntry,
+    ItemCrawlStats,
+    LockingMode,
+    SessionStatus,
+    StoreAggregateStats,
+    StoreCrawlStats,
+)
 from .metrics_sqlite_reads import MetricsDBReadMixin
 from .metrics_sqlite_writes import MetricsDBWriteMixin
 from .schema_registry import resolve_schema_path
@@ -36,3 +47,18 @@ class MetricsDB(MetricsDBWriteMixin, MetricsDBReadMixin, SQLiteStoreBase):
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         with self.connection() as conn:
             yield conn
+
+
+__all__ = [
+    "HEARTBEAT_TIMEOUT_SEC",
+    "AmazonBatchStats",
+    "CrawlSession",
+    "CycleStats",
+    "HeatmapEntry",
+    "ItemCrawlStats",
+    "LockingMode",
+    "MetricsDB",
+    "SessionStatus",
+    "StoreAggregateStats",
+    "StoreCrawlStats",
+]

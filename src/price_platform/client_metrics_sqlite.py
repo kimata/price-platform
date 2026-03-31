@@ -8,6 +8,18 @@ import sqlite3
 import threading
 from typing import TYPE_CHECKING
 
+from ._client_metrics_sqlite_models import (
+    BoxplotData,
+    ClientPerfDaily,
+    ClientPerfRaw,
+    DeviceType,
+    MetricName,
+    WebVitalBoxplotData,
+    WebVitalDaily,
+    WebVitalName,
+    WebVitalRaw,
+    detect_device_type,
+)
 from .client_metrics_boxplot import ClientMetricsBoxplotMixin
 from .client_metrics_svg import generate_boxplot_svg
 from .client_metrics_web_vitals import ClientMetricsWebVitalsReadMixin, ClientMetricsWebVitalsWriteMixin
@@ -49,4 +61,17 @@ class ClientMetricsDB(
             with self.connection() as conn:
                 yield conn
 
-__all__ = ["ClientMetricsDB", "generate_boxplot_svg"]
+__all__ = [
+    "BoxplotData",
+    "ClientMetricsDB",
+    "ClientPerfDaily",
+    "ClientPerfRaw",
+    "DeviceType",
+    "MetricName",
+    "WebVitalBoxplotData",
+    "WebVitalDaily",
+    "WebVitalName",
+    "WebVitalRaw",
+    "detect_device_type",
+    "generate_boxplot_svg",
+]
