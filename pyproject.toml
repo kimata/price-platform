@@ -9,7 +9,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "flask>=3.0.0",
     "flask-cors>=6.0.0",
-    "my-lib @ git+https://github.com/kimata/my-py-lib@2435d37f65cd9d2ca317e014049c1f0dd78fd8f5",
+    "my-lib @ git+https://github.com/kimata/my-py-lib@9d47b679b0892db446b3f502ee72a7f4083dcbd7",
     "PyJWT>=2.8.0",
     "requests>=2.32.0",
     "selenium>=4.0.0",
