@@ -6,6 +6,7 @@ import logging
 import pathlib
 import sqlite3
 import threading
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from ._client_metrics_sqlite_models import (
@@ -56,6 +57,7 @@ class ClientMetricsDB(
             schema_path=schema_path or resolve_schema_path("sqlite_client_metrics.schema", schema_dir=schema_dir),
         )
 
+    @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         with self._lock:
             with self.connection() as conn:

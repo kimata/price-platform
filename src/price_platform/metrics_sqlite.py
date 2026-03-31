@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pathlib
 import sqlite3
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from ._metrics_sqlite_models import (
@@ -44,6 +45,7 @@ class MetricsDB(MetricsDBWriteMixin, MetricsDBReadMixin, SQLiteStoreBase):
             locking_mode=locking_mode,
         )
 
+    @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         with self.connection() as conn:
             yield conn
