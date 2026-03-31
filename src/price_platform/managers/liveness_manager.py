@@ -11,6 +11,8 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from price_platform.platform import footprint
+
 logger = logging.getLogger(__name__)
 
 # Default liveness update interval in seconds
@@ -18,10 +20,8 @@ DEFAULT_UPDATE_INTERVAL = 30
 
 
 def _default_update_fn(path: pathlib.Path) -> None:
-    """Default liveness update using my_lib.footprint."""
-    import my_lib.footprint
-
-    my_lib.footprint.update(path)
+    """Default liveness update using the local footprint adapter."""
+    footprint.update(path)
 
 
 @dataclass

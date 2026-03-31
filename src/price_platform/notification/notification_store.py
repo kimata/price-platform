@@ -5,12 +5,11 @@ from __future__ import annotations
 import logging
 import pathlib
 import sqlite3
-from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-import my_lib.sqlite_util
-import my_lib.time
+from price_platform.platform import clock
+from price_platform.sqlite_store import SQLiteStoreBase
 from ._notification_store_types import (
     LockingMode,
     NotificationItem,
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 
-class NotificationStore:
+class NotificationStore(SQLiteStoreBase):
     """SQLite-based notification queue store.
 
     Each consuming application passes its own ``db_path`` and ``schema_dir``
@@ -49,26 +48,15 @@ class NotificationStore:
             locking_mode: SQLite locking mode (NORMAL for concurrent read,
                 EXCLUSIVE for single process)
         """
-        self._db_path = db_path
-        self._schema_dir = schema_dir
-        self._locking_mode: LockingMode = locking_mode
-        self._ensure_db_exists()
+        super().__init__(
+            db_path=db_path,
+            schema_path=schema_dir / "sqlite_notification.schema",
+            locking_mode=locking_mode,
+        )
 
-    def _ensure_db_exists(self) -> None:
-        """Ensure database and tables exist."""
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        schema_path = self._schema_dir / "sqlite_notification.schema"
-        if not schema_path.exists():
-            raise FileNotFoundError(f"Schema file not found: {schema_path}")
-
-        my_lib.sqlite_util.init_schema_from_file(self._db_path, schema_path, locking_mode=self._locking_mode)
-
-    @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Get database connection with WAL mode and optimized settings."""
-        with my_lib.sqlite_util.connect(self._db_path, locking_mode=self._locking_mode) as conn:
-            conn.row_factory = sqlite3.Row
+        """Get a database connection."""
+        with self.connection() as conn:
             yield conn
 
     def enqueue(self, event: Any, message: str, max_pending: int = 10) -> int:
@@ -153,7 +141,7 @@ class NotificationStore:
             item_id: The notification queue item ID
             tweet_id: Optional Twitter tweet ID
         """
-        now = my_lib.time.now()
+        now = clock.now()
         with self._get_connection() as conn:
             conn.execute(
                 """
@@ -367,7 +355,7 @@ class NotificationStore:
         Returns:
             Number of deleted items
         """
-        cutoff = my_lib.time.now() - timedelta(days=days)
+        cutoff = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
@@ -422,7 +410,7 @@ class NotificationStore:
             app_reset: App rate limit reset time
             user_reset: User rate limit reset time
         """
-        now = my_lib.time.now()
+        now = clock.now()
         with self._get_connection() as conn:
             conn.execute(
                 """

@@ -5,13 +5,12 @@ from __future__ import annotations
 import logging
 import sqlite3
 from collections.abc import Callable, Generator
-from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Generic, Literal, TypeVar
 
-import my_lib.sqlite_util
-import my_lib.time
+from price_platform.platform import clock
+from price_platform.sqlite_store import Migration, SQLiteStoreBase
 
 LockingMode = Literal["NORMAL", "EXCLUSIVE"]
 
@@ -20,7 +19,7 @@ EventT = TypeVar("EventT")
 logger = logging.getLogger(__name__)
 
 
-class BasePriceEventStore(Generic[EventT]):
+class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
     """SQLite-backed event store with configurable selection column."""
 
     def __init__(
@@ -33,43 +32,33 @@ class BasePriceEventStore(Generic[EventT]):
         locking_mode: LockingMode = "NORMAL",
         pre_schema_migrate: Callable[[sqlite3.Connection], None] | None = None,
     ):
-        self._db_path = db_path
-        self._schema_dir = schema_dir
         self._selection_column = selection_column
         self._event_factory = event_factory
-        self._locking_mode = locking_mode
+        migrations: list[Migration] = []
+        if pre_schema_migrate is not None:
+            migrations.append(Migration(name="legacy-pre-schema-migrate", apply=pre_schema_migrate))
+        if selection_column is not None:
+            migrations.append(
+                Migration(
+                    name=f"ensure-selection-column:{selection_column}",
+                    apply=lambda conn, column=selection_column: self._ensure_selection_column(conn, column),
+                )
+            )
+        super().__init__(
+            db_path=db_path,
+            schema_path=schema_dir / "sqlite_price_events.schema",
+            locking_mode=locking_mode,
+            migrations=migrations,
+        )
 
-        if self._db_path.exists() and pre_schema_migrate is not None:
-            with self._get_connection() as conn:
-                pre_schema_migrate(conn)
-                conn.commit()
+    def _ensure_selection_column(self, conn: sqlite3.Connection, column: str) -> None:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(price_events)").fetchall()}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE price_events ADD COLUMN {column} TEXT")
+            logger.info("Migrated price_events: added %s column", column)
 
-        self._ensure_db_exists()
-
-    def _ensure_db_exists(self) -> None:
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        schema_path = self._schema_dir / "sqlite_price_events.schema"
-        if not schema_path.exists():
-            raise FileNotFoundError(f"Schema file not found: {schema_path}")
-
-        my_lib.sqlite_util.init_schema_from_file(self._db_path, schema_path, locking_mode=self._locking_mode)
-        if self._selection_column is not None:
-            self._ensure_selection_column()
-
-    def _ensure_selection_column(self) -> None:
-        assert self._selection_column is not None
-        with self._get_connection() as conn:
-            columns = {row[1] for row in conn.execute("PRAGMA table_info(price_events)").fetchall()}
-            if self._selection_column not in columns:
-                conn.execute(f"ALTER TABLE price_events ADD COLUMN {self._selection_column} TEXT")
-                conn.commit()
-                logger.info("Migrated price_events: added %s column", self._selection_column)
-
-    @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
-        with my_lib.sqlite_util.connect(self._db_path, locking_mode=self._locking_mode) as conn:
-            conn.row_factory = sqlite3.Row
+        with self.connection() as conn:
             yield conn
 
     def save_event(self, event: object) -> int:
@@ -109,7 +98,7 @@ class BasePriceEventStore(Generic[EventT]):
             return cursor.lastrowid or 0
 
     def get_recent_event_for_product(self, product_id: str, hours: int = 24) -> EventT | None:
-        since = my_lib.time.now() - timedelta(hours=hours)
+        since = clock.now() - timedelta(hours=hours)
         with self._get_connection() as conn:
             row = conn.execute(
                 """
@@ -293,7 +282,7 @@ class BasePriceEventStore(Generic[EventT]):
         days: int = 14,
         tolerance: int = 100,
     ) -> bool:
-        since = my_lib.time.now() - timedelta(days=days)
+        since = clock.now() - timedelta(days=days)
         price_min = price - tolerance
         price_max = price + tolerance
         store_value = getattr(store, "value", store)
@@ -311,7 +300,7 @@ class BasePriceEventStore(Generic[EventT]):
             return row is not None
 
     def cleanup_old_events(self, days: int = 365) -> int:
-        cutoff = my_lib.time.now() - timedelta(days=days)
+        cutoff = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute("DELETE FROM price_events WHERE recorded_at < ?", (cutoff.isoformat(),))
             deleted = cursor.rowcount

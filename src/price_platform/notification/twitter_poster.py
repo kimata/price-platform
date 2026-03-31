@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-import my_lib.time
+from price_platform.platform import clock
 
 from ..config.models import TwitterConfig
 from .notification_store import NotificationItem, NotificationStore
@@ -37,7 +37,7 @@ class TwitterRateLimit:
     def from_headers(cls, headers: dict[str, str]) -> TwitterRateLimit | None:
         """Extract rate limit info from HTTP response headers."""
         try:
-            tz = my_lib.time.get_zoneinfo()
+            tz = clock.get_zoneinfo()
             return cls(
                 app_limit=int(headers.get("x-app-limit-24hour-limit", "0")),
                 app_remaining=int(headers.get("x-app-limit-24hour-remaining", "0")),
@@ -68,7 +68,7 @@ class TwitterRateLimit:
     @property
     def wait_seconds(self) -> int:
         """Seconds to wait until the rate limit resets."""
-        delta = self.next_reset - my_lib.time.now()
+        delta = self.next_reset - clock.now()
         return max(0, int(delta.total_seconds())) + 60  # +60s margin
 
 
@@ -176,7 +176,7 @@ class TwitterPoster:
         if state is None:
             return
 
-        now = my_lib.time.now()
+        now = clock.now()
         if state.next_available_at <= now:
             logger.info("保存されたレート制限は解除済み、状態をクリアします")
             self._store.clear_rate_limit_state()
@@ -197,7 +197,7 @@ class TwitterPoster:
         """Process pending notifications from the queue."""
         last_posted = self._store.get_last_posted_time()
         if last_posted is not None:
-            elapsed = (my_lib.time.now() - last_posted).total_seconds()
+            elapsed = (clock.now() - last_posted).total_seconds()
             wait_time = self._config.post_interval_sec - elapsed
             if wait_time > 0:
                 logger.debug("Waiting %.1f seconds before next post", wait_time)
@@ -226,7 +226,7 @@ class TwitterPoster:
 
         last_posted = self._store.get_last_posted_time_for_product(item.product_id)
         if last_posted is not None:
-            elapsed = my_lib.time.now() - last_posted
+            elapsed = clock.now() - last_posted
             if elapsed < timedelta(seconds=DUPLICATE_PRODUCT_INTERVAL_SEC):
                 remaining_hours = (
                     timedelta(seconds=DUPLICATE_PRODUCT_INTERVAL_SEC) - elapsed

@@ -13,14 +13,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
+from price_platform.platform import clock
+
 logger = logging.getLogger(__name__)
 
 
 def _default_now_fn() -> datetime:
-    """Default now function using my_lib.time."""
-    import my_lib.time
-
-    return my_lib.time.now()
+    """Default now function using the local clock adapter."""
+    return clock.now()
 
 
 @runtime_checkable
@@ -404,4 +404,3 @@ class MetricsManager:
                 for name, acc in self._store_accumulators.items()
             },
         }
-

@@ -8,8 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
-import my_lib.browser_manager
-import my_lib.selenium_util
+from price_platform.platform import browser
 
 if TYPE_CHECKING:
     from selenium.webdriver.remote.webdriver import WebDriver
@@ -30,14 +29,14 @@ class BaseWebDriverPool(Generic[MakerT, ConfigT]):
     config: ConfigT
     profile_name_getter: Callable[[MakerT], str]
     page_load_timeout: int | None = None
-    _managers: dict[MakerT, my_lib.browser_manager.BrowserManager] = field(default_factory=dict, init=False)
+    _managers: dict[MakerT, browser.BrowserManager] = field(default_factory=dict, init=False)
     _consecutive_timeout_counts: dict[MakerT, int] = field(default_factory=dict, init=False)
 
-    def _get_or_create_manager(self, maker: MakerT) -> my_lib.browser_manager.BrowserManager:
+    def _get_or_create_manager(self, maker: MakerT) -> browser.BrowserManager:
         if maker not in self._managers:
             data_path = pathlib.Path(self.config.selenium.data_path)
             profile_name = self.profile_name_getter(maker)
-            self._managers[maker] = my_lib.browser_manager.BrowserManager(
+            self._managers[maker] = browser.create_browser_manager(
                 profile_name=profile_name,
                 data_dir=data_path,
                 clear_profile_on_error=True,
@@ -93,7 +92,7 @@ class BaseWebDriverPool(Generic[MakerT, ConfigT]):
     def clear_cache(self) -> None:
         for maker, manager in self._managers.items():
             driver, _ = manager.get_driver()
-            my_lib.selenium_util.clear_cache(driver)
+            browser.clear_cache(driver)
             logger.info("ブラウザキャッシュをクリア: %s", self.profile_name_getter(maker))
 
     def __enter__(self) -> BaseWebDriverPool[MakerT, ConfigT]:

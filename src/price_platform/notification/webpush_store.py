@@ -10,8 +10,8 @@ from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 
-import my_lib.sqlite_util
-import my_lib.time
+from price_platform.platform import clock
+from price_platform.sqlite_store import Migration, SQLiteStoreBase
 from ._webpush_store_types import (
     DeliveryLogEntry,
     DeliveryStatus,
@@ -22,7 +22,7 @@ from ._webpush_store_types import (
 
 logger = logging.getLogger(__name__)
 
-class BaseWebPushStore:
+class BaseWebPushStore(SQLiteStoreBase):
     """SQLite-backed Web Push subscription store with configurable group column."""
 
     def __init__(
@@ -36,64 +36,48 @@ class BaseWebPushStore:
         locking_mode: LockingMode = "NORMAL",
         subscription_factory: SubscriptionFactory | None = None,
     ):
-        self._db_path = db_path
-        self._schema_dir = schema_dir
         self._group_filter_column = group_filter_column
         self._legacy_group_filter_columns = tuple(legacy_group_filter_columns)
         self._legacy_product_filter_columns = tuple(legacy_product_filter_columns)
-        self._locking_mode = locking_mode
         self._subscription_factory = subscription_factory or WebPushSubscriptionRecord
-        self._ensure_db_exists()
-
-    def _ensure_db_exists(self) -> None:
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        schema_path = self._schema_dir / "sqlite_webpush.schema"
-        if not schema_path.exists():
-            raise FileNotFoundError(f"Schema file not found: {schema_path}")
-
-        my_lib.sqlite_util.init_schema_from_file(
-            self._db_path,
-            schema_path,
-            locking_mode=self._locking_mode,
+        super().__init__(
+            db_path=db_path,
+            schema_path=schema_dir / "sqlite_webpush.schema",
+            locking_mode=locking_mode,
+            migrations=(Migration(name="migrate-webpush-columns", apply=self._migrate_db),),
         )
-        self._migrate_db()
 
-    def _migrate_db(self) -> None:
-        with self._get_connection() as conn:
-            columns = {row[1] for row in conn.execute("PRAGMA table_info(webpush_subscriptions)")}
+    def _migrate_db(self, conn: sqlite3.Connection) -> None:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(webpush_subscriptions)")}
 
-            if self._group_filter_column not in columns:
-                for legacy_column in self._legacy_group_filter_columns:
-                    if legacy_column in columns:
-                        conn.execute(
-                            f"ALTER TABLE webpush_subscriptions RENAME COLUMN {legacy_column} TO {self._group_filter_column}"
-                        )
-                        logger.info(
-                            "Migrated webpush_subscriptions: %s -> %s",
-                            legacy_column,
-                            self._group_filter_column,
-                        )
-                        break
+        if self._group_filter_column not in columns:
+            for legacy_column in self._legacy_group_filter_columns:
+                if legacy_column in columns:
+                    conn.execute(
+                        f"ALTER TABLE webpush_subscriptions RENAME COLUMN {legacy_column} TO {self._group_filter_column}"
+                    )
+                    logger.info(
+                        "Migrated webpush_subscriptions: %s -> %s",
+                        legacy_column,
+                        self._group_filter_column,
+                    )
+                    break
 
-            if "product_filter" not in columns:
-                for legacy_column in self._legacy_product_filter_columns:
-                    if legacy_column in columns:
-                        conn.execute(
-                            f"ALTER TABLE webpush_subscriptions RENAME COLUMN {legacy_column} TO product_filter"
-                        )
-                        logger.info(
-                            "Migrated webpush_subscriptions: %s -> product_filter",
-                            legacy_column,
-                        )
-                        break
-
-            conn.commit()
+        if "product_filter" not in columns:
+            for legacy_column in self._legacy_product_filter_columns:
+                if legacy_column in columns:
+                    conn.execute(
+                        f"ALTER TABLE webpush_subscriptions RENAME COLUMN {legacy_column} TO product_filter"
+                    )
+                    logger.info(
+                        "Migrated webpush_subscriptions: %s -> product_filter",
+                        legacy_column,
+                    )
+                    break
 
     @contextmanager
-    def _get_connection(self) -> sqlite3.Connection:
-        with my_lib.sqlite_util.connect(self._db_path, locking_mode=self._locking_mode) as conn:
-            conn.row_factory = sqlite3.Row
+    def _get_connection(self):
+        with self.connection() as conn:
             yield conn
 
     def save_subscription(
@@ -109,7 +93,7 @@ class BaseWebPushStore:
         group_json = json.dumps(group_filter) if group_filter else None
         event_json = json.dumps(event_type_filter) if event_type_filter else None
         product_json = json.dumps(product_filter) if product_filter else None
-        now = my_lib.time.now()
+        now = clock.now()
 
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -266,7 +250,7 @@ class BaseWebPushStore:
         with self._get_connection() as conn:
             conn.execute(
                 "UPDATE webpush_subscriptions SET last_used_at = ? WHERE id = ?",
-                (my_lib.time.now().isoformat(), subscription_id),
+                (clock.now().isoformat(), subscription_id),
             )
             conn.commit()
 
@@ -292,7 +276,7 @@ class BaseWebPushStore:
         status: DeliveryStatus,
         error_message: str | None = None,
     ) -> int:
-        now = my_lib.time.now()
+        now = clock.now()
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
@@ -319,7 +303,7 @@ class BaseWebPushStore:
         return [self._row_to_delivery_log(row) for row in rows]
 
     def get_delivery_stats(self, days: int = 30) -> dict[str, int]:
-        since = my_lib.time.now() - timedelta(days=days)
+        since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             rows = conn.execute(
                 """

@@ -287,11 +287,11 @@ class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT]):
 
     @contextlib.contextmanager
     def get_webdriver(self) -> Generator[tuple[WebDriver, WebDriverWait], None, None]:
-        import my_lib.selenium_util
         import selenium.webdriver.support.wait
+        from price_platform.platform import browser
 
         data_path = pathlib.Path(self.config.selenium.data_path)
-        driver = my_lib.selenium_util.create_driver(
+        driver = browser.create_driver(
             profile_name=self._webdriver_profile_name,
             data_path=data_path,
             is_headless=self.config.selenium.headless,
@@ -300,7 +300,7 @@ class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT]):
         try:
             yield driver, wait
         finally:
-            my_lib.selenium_util.quit_driver_gracefully(driver)
+            browser.quit_driver_gracefully(driver)
 
     @abstractmethod
     def scrape(self, product: ProductT) -> list[ScrapedPriceT]:

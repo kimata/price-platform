@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-import my_lib.time
+from .platform import clock
 
 LockingMode = Literal["NORMAL", "EXCLUSIVE"]
 
@@ -46,7 +46,7 @@ class CrawlSession:
             return False
         if self.last_heartbeat_at is None:
             return True
-        elapsed = (my_lib.time.now() - self.last_heartbeat_at).total_seconds()
+        elapsed = (clock.now() - self.last_heartbeat_at).total_seconds()
         return elapsed > HEARTBEAT_TIMEOUT_SEC
 
     @property

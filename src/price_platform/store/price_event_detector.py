@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any, Generic, Protocol, TypeVar
 
-import my_lib.time
+from price_platform.platform import clock
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +144,7 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
 
         full_history = self.price_store.get_price_history(product_id, days=max_days)
 
-        now = my_lib.time.now()
+        now = clock.now()
         price_history: dict[int, list[PriceRecordT]] = {}
         for days in history_days:
             cutoff = now - timedelta(days=days)
@@ -227,7 +227,7 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
             return []
 
         ctx = self._build_price_context(product_id, current_prices)
-        now = my_lib.time.now()
+        now = clock.now()
         detected = self._detect_events(ctx, now)
         return self._apply_suppression(product_id, detected)
 
@@ -240,7 +240,7 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
             return []
 
         ctx = self._build_price_context(product_id, current_prices)
-        now = my_lib.time.now()
+        now = clock.now()
         return self._detect_events(ctx, now)
 
     def _check_all_time_low(
