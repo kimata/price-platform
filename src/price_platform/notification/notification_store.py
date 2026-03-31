@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -55,6 +56,7 @@ class NotificationStore(SQLiteStoreBase):
             locking_mode=locking_mode,
         )
 
+    @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         """Get a database connection."""
         with self.connection() as conn:
