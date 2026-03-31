@@ -36,8 +36,5 @@ allow-direct-references = true
 [tool.uv]
 default-groups = ["dev"]
 
-[tool.uv.sources]
-my-lib = { path = "../my-py-lib", editable = true }
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
