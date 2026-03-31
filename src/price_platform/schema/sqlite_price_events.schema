@@ -1,0 +1,27 @@
+-- Shared price-events schema owned by price-platform
+CREATE TABLE IF NOT EXISTS price_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    priority INTEGER NOT NULL,
+    product_id TEXT NOT NULL,
+    store TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    url TEXT,
+    previous_price INTEGER,
+    reference_price INTEGER,
+    change_percent REAL,
+    period_days INTEGER,
+    selection_key TEXT,
+    recorded_at TEXT NOT NULL,
+    suppressed INTEGER NOT NULL DEFAULT 0,
+    superseded_by INTEGER,
+    twitter_posted INTEGER NOT NULL DEFAULT 0,
+    twitter_enabled INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (superseded_by) REFERENCES price_events(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_events_product_id ON price_events(product_id);
+CREATE INDEX IF NOT EXISTS idx_price_events_event_type ON price_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_price_events_recorded_at ON price_events(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_price_events_suppressed ON price_events(suppressed);
+CREATE INDEX IF NOT EXISTS idx_price_events_priority ON price_events(priority);

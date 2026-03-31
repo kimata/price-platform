@@ -10,8 +10,14 @@ from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 
+from price_platform.migrations import (
+    CANONICAL_GROUP_FILTER_COLUMN,
+    CANONICAL_PRODUCT_FILTER_COLUMN,
+    build_webpush_migrations,
+)
 from price_platform.platform import clock
-from price_platform.sqlite_store import Migration, SQLiteStoreBase
+from price_platform.schema_registry import resolve_schema_path
+from price_platform.sqlite_store import SQLiteStoreBase
 from ._webpush_store_types import (
     DeliveryLogEntry,
     DeliveryStatus,
@@ -28,7 +34,7 @@ class BaseWebPushStore(SQLiteStoreBase):
     def __init__(
         self,
         db_path: pathlib.Path,
-        schema_dir: pathlib.Path,
+        schema_dir: pathlib.Path | None,
         *,
         group_filter_column: str,
         legacy_group_filter_columns: Iterable[str] = (),
@@ -36,44 +42,20 @@ class BaseWebPushStore(SQLiteStoreBase):
         locking_mode: LockingMode = "NORMAL",
         subscription_factory: SubscriptionFactory | None = None,
     ):
-        self._group_filter_column = group_filter_column
+        self._group_filter_column = CANONICAL_GROUP_FILTER_COLUMN
         self._legacy_group_filter_columns = tuple(legacy_group_filter_columns)
         self._legacy_product_filter_columns = tuple(legacy_product_filter_columns)
         self._subscription_factory = subscription_factory or WebPushSubscriptionRecord
         super().__init__(
             db_path=db_path,
-            schema_path=schema_dir / "sqlite_webpush.schema",
+            schema_path=resolve_schema_path("sqlite_webpush.schema", schema_dir=schema_dir),
             locking_mode=locking_mode,
-            migrations=(Migration(name="migrate-webpush-columns", apply=self._migrate_db),),
+            migrations=build_webpush_migrations(
+                group_filter_column=group_filter_column,
+                legacy_group_filter_columns=legacy_group_filter_columns,
+                legacy_product_filter_columns=legacy_product_filter_columns,
+            ),
         )
-
-    def _migrate_db(self, conn: sqlite3.Connection) -> None:
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(webpush_subscriptions)")}
-
-        if self._group_filter_column not in columns:
-            for legacy_column in self._legacy_group_filter_columns:
-                if legacy_column in columns:
-                    conn.execute(
-                        f"ALTER TABLE webpush_subscriptions RENAME COLUMN {legacy_column} TO {self._group_filter_column}"
-                    )
-                    logger.info(
-                        "Migrated webpush_subscriptions: %s -> %s",
-                        legacy_column,
-                        self._group_filter_column,
-                    )
-                    break
-
-        if "product_filter" not in columns:
-            for legacy_column in self._legacy_product_filter_columns:
-                if legacy_column in columns:
-                    conn.execute(
-                        f"ALTER TABLE webpush_subscriptions RENAME COLUMN {legacy_column} TO product_filter"
-                    )
-                    logger.info(
-                        "Migrated webpush_subscriptions: %s -> product_filter",
-                        legacy_column,
-                    )
-                    break
 
     @contextmanager
     def _get_connection(self):
@@ -174,7 +156,9 @@ class BaseWebPushStore(SQLiteStoreBase):
             if row is None:
                 return False
 
-            current_filter = json.loads(row["product_filter"]) if row["product_filter"] else []
+            current_filter = (
+                json.loads(row[CANONICAL_PRODUCT_FILTER_COLUMN]) if row[CANONICAL_PRODUCT_FILTER_COLUMN] else []
+            )
             if subscribe:
                 if product_id not in current_filter:
                     current_filter.append(product_id)
@@ -183,7 +167,7 @@ class BaseWebPushStore(SQLiteStoreBase):
 
             product_json = json.dumps(current_filter) if current_filter else None
             cursor = conn.execute(
-                "UPDATE webpush_subscriptions SET product_filter = ? WHERE endpoint = ?",
+                f"UPDATE webpush_subscriptions SET {CANONICAL_PRODUCT_FILTER_COLUMN} = ? WHERE endpoint = ?",
                 (product_json, endpoint),
             )
             conn.commit()
@@ -358,7 +342,7 @@ class BaseWebPushStore(SQLiteStoreBase):
 
         product_counts: dict[str, int] = {}
         for row in rows:
-            product_filter = row["product_filter"]
+            product_filter = row[CANONICAL_PRODUCT_FILTER_COLUMN]
             if not product_filter:
                 continue
             for product_id in json.loads(product_filter):
@@ -368,7 +352,9 @@ class BaseWebPushStore(SQLiteStoreBase):
     def _row_to_subscription(self, row: sqlite3.Row) -> WebPushSubscriptionRecord:
         group_filter = json.loads(row[self._group_filter_column]) if row[self._group_filter_column] else None
         event_type_filter = json.loads(row["event_type_filter"]) if row["event_type_filter"] else None
-        product_filter = json.loads(row["product_filter"]) if row["product_filter"] else None
+        product_filter = (
+            json.loads(row[CANONICAL_PRODUCT_FILTER_COLUMN]) if row[CANONICAL_PRODUCT_FILTER_COLUMN] else None
+        )
         last_used_at = datetime.fromisoformat(row["last_used_at"]) if row["last_used_at"] else None
         return self._subscription_factory(
             id=row["id"],

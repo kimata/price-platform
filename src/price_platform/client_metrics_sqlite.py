@@ -6,13 +6,19 @@ import logging
 import pathlib
 import sqlite3
 import threading
+from typing import TYPE_CHECKING
 
 from .client_metrics_boxplot import ClientMetricsBoxplotMixin
 from .client_metrics_svg import generate_boxplot_svg
 from .client_metrics_web_vitals import ClientMetricsWebVitalsReadMixin, ClientMetricsWebVitalsWriteMixin
 from .client_metrics_writes import ClientMetricsWriteMixin
+from .schema_registry import resolve_schema_path
+from .sqlite_store import SQLiteStoreBase
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class ClientMetricsDB(
@@ -20,26 +26,27 @@ class ClientMetricsDB(
     ClientMetricsBoxplotMixin,
     ClientMetricsWebVitalsWriteMixin,
     ClientMetricsWebVitalsReadMixin,
+    SQLiteStoreBase,
 ):
     """SQLite database for client performance metrics."""
 
-    def __init__(self, db_path: pathlib.Path, schema_path: pathlib.Path):
-        self.db_path = db_path
-        self.schema_path = schema_path
-        self._lock = threading.Lock()
+    def __init__(
+        self,
+        db_path: pathlib.Path,
+        schema_path: pathlib.Path | None = None,
+        *,
+        schema_dir: pathlib.Path | None = None,
+    ):
+        self._lock = threading.RLock()
         self._last_aggregated_date: str | None = None
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_schema()
+        super().__init__(
+            db_path=db_path,
+            schema_path=schema_path or resolve_schema_path("sqlite_client_metrics.schema", schema_dir=schema_dir),
+        )
 
-    def _init_schema(self) -> None:
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         with self._lock:
-            conn = sqlite3.connect(self.db_path)
-            try:
-                with self.schema_path.open() as f:
-                    schema = f.read()
-                conn.executescript(schema)
-                conn.commit()
-            finally:
-                conn.close()
+            with self.connection() as conn:
+                yield conn
 
 __all__ = ["ClientMetricsDB", "generate_boxplot_svg"]

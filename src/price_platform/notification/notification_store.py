@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from price_platform.platform import clock
+from price_platform.schema_registry import resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
 from ._notification_store_types import (
     LockingMode,
@@ -28,15 +29,15 @@ logger = logging.getLogger(__name__)
 class NotificationStore(SQLiteStoreBase):
     """SQLite-based notification queue store.
 
-    Each consuming application passes its own ``db_path`` and ``schema_dir``
-    so that the database and schema files remain in the application's
-    data directory.
+    ``price-platform`` owns the canonical notification schema. A consuming
+    application can still provide ``schema_dir`` as an override for tests or
+    controlled migrations.
     """
 
     def __init__(
         self,
         db_path: pathlib.Path,
-        schema_dir: pathlib.Path,
+        schema_dir: pathlib.Path | None,
         *,
         locking_mode: LockingMode = "NORMAL",
     ):
@@ -44,13 +45,13 @@ class NotificationStore(SQLiteStoreBase):
 
         Args:
             db_path: Path to the notification database file
-            schema_dir: Path to the schema directory
+            schema_dir: Optional override path to the schema directory
             locking_mode: SQLite locking mode (NORMAL for concurrent read,
                 EXCLUSIVE for single process)
         """
         super().__init__(
             db_path=db_path,
-            schema_path=schema_dir / "sqlite_notification.schema",
+            schema_path=resolve_schema_path("sqlite_notification.schema", schema_dir=schema_dir),
             locking_mode=locking_mode,
         )
 
@@ -458,7 +459,7 @@ class NotificationStore(SQLiteStoreBase):
             logger.debug("Cleared rate limit state")
 
 
-def open_notification_store(db_path: pathlib.Path, schema_dir: pathlib.Path) -> NotificationStore:
+def open_notification_store(db_path: pathlib.Path, schema_dir: pathlib.Path | None = None) -> NotificationStore:
     """Create a notification store without touching any global singleton."""
     return NotificationStore(db_path, schema_dir)
 
@@ -489,12 +490,12 @@ def get_notification_store() -> NotificationStore:
     return _notification_store
 
 
-def init_notification_store(db_path: pathlib.Path, schema_dir: pathlib.Path) -> NotificationStore:
+def init_notification_store(db_path: pathlib.Path, schema_dir: pathlib.Path | None = None) -> NotificationStore:
     """Initialize and return the global notification store.
 
     Args:
         db_path: Path to the notification database file
-        schema_dir: Path to the schema directory
+        schema_dir: Optional override path to the schema directory
 
     Returns:
         The initialized NotificationStore instance

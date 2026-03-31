@@ -9,8 +9,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Generic, Literal, TypeVar
 
+from price_platform.migrations import CANONICAL_SELECTION_COLUMN, build_price_event_migrations
 from price_platform.platform import clock
-from price_platform.sqlite_store import Migration, SQLiteStoreBase
+from price_platform.schema_registry import resolve_schema_path
+from price_platform.sqlite_store import SQLiteStoreBase
 
 LockingMode = Literal["NORMAL", "EXCLUSIVE"]
 
@@ -26,7 +28,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         self,
         *,
         db_path: Path,
-        schema_dir: Path,
+        schema_dir: Path | None,
         selection_column: str | None,
         event_factory: Callable[[sqlite3.Row, str | None], EventT],
         locking_mode: LockingMode = "NORMAL",
@@ -34,35 +36,22 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
     ):
         self._selection_column = selection_column
         self._event_factory = event_factory
-        migrations: list[Migration] = []
-        if pre_schema_migrate is not None:
-            migrations.append(Migration(name="legacy-pre-schema-migrate", apply=pre_schema_migrate))
-        if selection_column is not None:
-            migrations.append(
-                Migration(
-                    name=f"ensure-selection-column:{selection_column}",
-                    apply=lambda conn, column=selection_column: self._ensure_selection_column(conn, column),
-                )
-            )
         super().__init__(
             db_path=db_path,
-            schema_path=schema_dir / "sqlite_price_events.schema",
+            schema_path=resolve_schema_path("sqlite_price_events.schema", schema_dir=schema_dir),
             locking_mode=locking_mode,
-            migrations=migrations,
+            migrations=build_price_event_migrations(
+                selection_column=selection_column,
+                pre_schema_migrate=pre_schema_migrate,
+            ),
         )
-
-    def _ensure_selection_column(self, conn: sqlite3.Connection, column: str) -> None:
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(price_events)").fetchall()}
-        if column not in columns:
-            conn.execute(f"ALTER TABLE price_events ADD COLUMN {column} TEXT")
-            logger.info("Migrated price_events: added %s column", column)
 
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         with self.connection() as conn:
             yield conn
 
     def save_event(self, event: object) -> int:
-        selection_sql = f"{self._selection_column}, " if self._selection_column else ""
+        selection_sql = f"{CANONICAL_SELECTION_COLUMN}, " if self._selection_column else ""
         selection_placeholder = "?, " if self._selection_column else ""
         selection_value = getattr(event, self._selection_column) if self._selection_column else None
 
@@ -332,7 +321,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         selection_value = None
         if self._selection_column is not None:
             try:
-                selection_value = row[self._selection_column]
+                selection_value = row[CANONICAL_SELECTION_COLUMN]
             except (IndexError, KeyError):
                 selection_value = None
         return self._event_factory(row, selection_value)

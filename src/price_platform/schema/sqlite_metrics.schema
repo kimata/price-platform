@@ -1,0 +1,61 @@
+-- Shared crawl metrics schema owned by price-platform
+CREATE TABLE IF NOT EXISTS crawl_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    last_heartbeat_at TEXT,
+    ended_at TEXT,
+    work_ended_at TEXT,
+    duration_sec REAL,
+    total_items INTEGER DEFAULT 0,
+    success_items INTEGER DEFAULT 0,
+    failed_items INTEGER DEFAULT 0,
+    total_products INTEGER DEFAULT 0,
+    success_products INTEGER DEFAULT 0,
+    round_count INTEGER DEFAULT 0,
+    round_start_product_count INTEGER DEFAULT 0,
+    round_start_store_count INTEGER DEFAULT 0,
+    last_round_completed_at TEXT,
+    exit_reason TEXT
+);
+
+CREATE TABLE IF NOT EXISTS store_crawl_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    store_name TEXT NOT NULL,
+    total_items INTEGER DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    total_duration_sec REAL DEFAULT 0,
+    FOREIGN KEY (session_id) REFERENCES crawl_sessions(id),
+    UNIQUE(session_id, store_name)
+);
+
+CREATE TABLE IF NOT EXISTS item_crawl_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    store_name TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    duration_sec REAL,
+    success BOOLEAN DEFAULT TRUE,
+    error_message TEXT,
+    FOREIGN KEY (session_id) REFERENCES crawl_sessions(id)
+);
+
+CREATE TABLE IF NOT EXISTS amazon_batch_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    started_at TEXT NOT NULL,
+    duration_sec REAL,
+    product_count INTEGER,
+    success BOOLEAN DEFAULT TRUE,
+    error_message TEXT,
+    FOREIGN KEY (session_id) REFERENCES crawl_sessions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON crawl_sessions(started_at);
+CREATE INDEX IF NOT EXISTS idx_item_stats_started ON item_crawl_stats(started_at);
+CREATE INDEX IF NOT EXISTS idx_item_stats_store ON item_crawl_stats(store_name);
+CREATE INDEX IF NOT EXISTS idx_item_stats_session ON item_crawl_stats(session_id);
+CREATE INDEX IF NOT EXISTS idx_store_stats_session ON store_crawl_stats(session_id);
+CREATE INDEX IF NOT EXISTS idx_amazon_batch_session ON amazon_batch_stats(session_id);

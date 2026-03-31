@@ -22,56 +22,52 @@ class ClientMetricsBoxplotMixin:
         yesterday = (clock.now() - timedelta(days=1)).date()
         realtime_dates = [today.isoformat(), yesterday.isoformat()]
 
-        with self._lock:
-            conn = sqlite3.connect(self.db_path)
-            try:
-                cursor = conn.execute(
-                    """
-                    SELECT date, device_type, min_value, q1_value,
-                           median_value, q3_value, max_value, avg_value, entry_count
-                    FROM client_perf_daily
-                    WHERE metric_name = ?
-                      AND date >= ?
-                    ORDER BY date ASC, device_type ASC
-                    """,
-                    (metric_name, cutoff_str),
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT date, device_type, min_value, q1_value,
+                       median_value, q3_value, max_value, avg_value, entry_count
+                FROM client_perf_daily
+                WHERE metric_name = ?
+                  AND date >= ?
+                ORDER BY date ASC, device_type ASC
+                """,
+                (metric_name, cutoff_str),
+            )
+            rows = cursor.fetchall()
+
+            result = [
+                BoxplotData(
+                    date=row[0],
+                    device_type=row[1],
+                    min_val=row[2],
+                    q1=row[3],
+                    median=row[4],
+                    q3=row[5],
+                    max_val=row[6],
+                    avg=row[7],
+                    count=row[8],
                 )
-                rows = cursor.fetchall()
+                for row in rows
+            ]
 
-                result = [
-                    BoxplotData(
-                        date=row[0],
-                        device_type=row[1],
-                        min_val=row[2],
-                        q1=row[3],
-                        median=row[4],
-                        q3=row[5],
-                        max_val=row[6],
-                        avg=row[7],
-                        count=row[8],
-                    )
-                    for row in rows
-                ]
+            aggregated_date_device_pairs = {(d.date, d.device_type) for d in result}
+            device_types: list[DeviceType] = ["mobile", "desktop"]
 
-                aggregated_date_device_pairs = {(d.date, d.device_type) for d in result}
-                device_types: list[DeviceType] = ["mobile", "desktop"]
+            missing_dates: list[str] = []
+            for date_str in realtime_dates:
+                for device_type in device_types:
+                    if (date_str, device_type) not in aggregated_date_device_pairs:
+                        if date_str not in missing_dates:
+                            missing_dates.append(date_str)
+                        break
 
-                missing_dates: list[str] = []
-                for date_str in realtime_dates:
-                    for device_type in device_types:
-                        if (date_str, device_type) not in aggregated_date_device_pairs:
-                            if date_str not in missing_dates:
-                                missing_dates.append(date_str)
-                            break
-
-                for date_str in missing_dates:
-                    for device_type in device_types:
-                        if (date_str, device_type) not in aggregated_date_device_pairs:
-                            stats = self._compute_stats_for_date(conn, date_str, metric_name, device_type)
-                            if stats:
-                                result.append(stats)
-            finally:
-                conn.close()
+            for date_str in missing_dates:
+                for device_type in device_types:
+                    if (date_str, device_type) not in aggregated_date_device_pairs:
+                        stats = self._compute_stats_for_date(conn, date_str, metric_name, device_type)
+                        if stats:
+                            result.append(stats)
 
         result.sort(key=lambda x: (x.date, x.device_type))
         return result
@@ -129,16 +125,12 @@ class ClientMetricsBoxplotMixin:
         device_types: list[DeviceType] = ["mobile", "desktop"]
         result: list[BoxplotData] = []
 
-        with self._lock:
-            conn = sqlite3.connect(self.db_path)
-            try:
-                for date_str in dates:
-                    for device_type in device_types:
-                        stats = self._compute_stats_for_date(conn, date_str, metric_name, device_type)
-                        if stats:
-                            result.append(stats)
-            finally:
-                conn.close()
+        with self._get_connection() as conn:
+            for date_str in dates:
+                for device_type in device_types:
+                    stats = self._compute_stats_for_date(conn, date_str, metric_name, device_type)
+                    if stats:
+                        result.append(stats)
 
         return result
 
@@ -150,12 +142,8 @@ class ClientMetricsBoxplotMixin:
         device_types: list[DeviceType] = ["mobile", "desktop"]
         result: dict[DeviceType, BoxplotData | None] = {}
 
-        with self._lock:
-            conn = sqlite3.connect(self.db_path)
-            try:
-                for device_type in device_types:
-                    result[device_type] = self._compute_stats_for_date(conn, today, metric_name, device_type)
-            finally:
-                conn.close()
+        with self._get_connection() as conn:
+            for device_type in device_types:
+                result[device_type] = self._compute_stats_for_date(conn, today, metric_name, device_type)
 
         return result

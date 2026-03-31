@@ -66,6 +66,25 @@ uv sync
 
 これら以外の `my_lib` 依存は `price_platform.platform.*` の facade を追加してから使います。`price-platform` 側で同等の低レベル実装を再実装しないことも方針です。
 
+### SQLite schema ownership
+
+`price-platform` 管轄の SQLite schema は `src/price_platform/schema/` が canonical です。対象は次の DB です。
+
+- `sqlite_notification.schema`
+- `sqlite_metrics.schema`
+- `sqlite_client_metrics.schema`
+- `sqlite_price_events.schema`
+- `sqlite_webpush.schema`
+
+consumer app 側の `schema/` は override か legacy migration 用にだけ残せますが、baseline schema と migration の owner は `price-platform` です。
+
+共通化のため、DB 列名も canonical 名に寄せています。
+
+- `price_events.selection_key`
+- `webpush_subscriptions.group_filter`
+
+アプリ固有の `color_id` / `variant_id` / `maker_filter` / `category_filter` などは migration で吸収します。
+
 ### 依存関係
 
 - Python >= 3.11

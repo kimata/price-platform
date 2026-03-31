@@ -1,0 +1,34 @@
+-- Shared webpush schema owned by price-platform
+CREATE TABLE IF NOT EXISTS webpush_subscriptions (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    endpoint          TEXT NOT NULL UNIQUE,
+    p256dh_key        TEXT NOT NULL,
+    auth_key          TEXT NOT NULL,
+    group_filter      TEXT,
+    event_type_filter TEXT,
+    product_filter    TEXT,
+    created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    last_used_at      TIMESTAMPTZ,
+    is_active         BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_endpoint ON webpush_subscriptions(endpoint);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_active ON webpush_subscriptions(is_active);
+
+CREATE TABLE IF NOT EXISTS webpush_delivery_logs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    subscription_id INTEGER NOT NULL,
+    event_id        INTEGER,
+    endpoint        TEXT,
+    status          TEXT NOT NULL,
+    event_type      TEXT,
+    product_id      TEXT,
+    sent_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    error_message   TEXT,
+    detail          TEXT,
+    FOREIGN KEY (subscription_id) REFERENCES webpush_subscriptions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_delivery_subscription ON webpush_delivery_logs(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_status ON webpush_delivery_logs(status);
+CREATE INDEX IF NOT EXISTS idx_delivery_sent_at ON webpush_delivery_logs(sent_at DESC);

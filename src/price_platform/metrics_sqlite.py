@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from ._metrics_sqlite_models import LockingMode
 from .metrics_sqlite_reads import MetricsDBReadMixin
 from .metrics_sqlite_writes import MetricsDBWriteMixin
+from .schema_registry import resolve_schema_path
 from .sqlite_store import SQLiteStoreBase
 
 if TYPE_CHECKING:
@@ -21,11 +22,16 @@ class MetricsDB(MetricsDBWriteMixin, MetricsDBReadMixin, SQLiteStoreBase):
     def __init__(
         self,
         db_path: pathlib.Path,
-        schema_path: pathlib.Path,
+        schema_path: pathlib.Path | None = None,
         *,
+        schema_dir: pathlib.Path | None = None,
         locking_mode: LockingMode = "NORMAL",
     ):
-        super().__init__(db_path=db_path, schema_path=schema_path, locking_mode=locking_mode)
+        super().__init__(
+            db_path=db_path,
+            schema_path=schema_path or resolve_schema_path("sqlite_metrics.schema", schema_dir=schema_dir),
+            locking_mode=locking_mode,
+        )
 
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         with self.connection() as conn:
