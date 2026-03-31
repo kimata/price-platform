@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import my_lib.config
+import price_platform._adapters
 
 
 @dataclass(frozen=True)
@@ -94,7 +94,7 @@ def load_about_content(about_file: Path, schema_file: Path) -> AboutContent | No
     if not about_file.exists():
         return None
 
-    data = my_lib.config.load(about_file, schema_file, include_base_dir=False)
+    data = price_platform._adapters.load_yaml_config(about_file, schema_file, include_base_dir=False)
     if data is None:
         return None
 

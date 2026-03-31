@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import my_lib.config
+import price_platform._adapters
 import price_platform.config
 
 
@@ -87,7 +88,7 @@ def test_load_app_config_for_reads_env_var(monkeypatch) -> None:
     )
 
     monkeypatch.setenv(spec.env_var_name, "/tmp/app/config.yaml")
-    monkeypatch.setattr(my_lib.config, "load", lambda path: _make_config_data())
+    monkeypatch.setattr(price_platform._adapters, "load_yaml_config", lambda path: _make_config_data())
 
     config = price_platform.config.load_app_config_for(price_platform.config.AppConfig, spec)
 

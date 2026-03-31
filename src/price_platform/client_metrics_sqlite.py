@@ -2,264 +2,32 @@
 
 from __future__ import annotations
 
-import functools
 import logging
-import math
 import pathlib
-import re
 import sqlite3
 import statistics
 import threading
-from dataclasses import dataclass
-from datetime import date, timedelta
-from typing import Literal
+from datetime import timedelta
 
 import my_lib.time
-
-logger = logging.getLogger(__name__)
-
-DeviceType = Literal["mobile", "desktop"]
-MetricName = Literal["ttfb_ms", "dom_interactive_ms", "dom_complete_ms", "load_event_ms"]
-WebVitalName = Literal["LCP", "CLS", "INP", "FCP", "TTFB"]
-WebVitalRating = Literal["good", "needs-improvement", "poor"]
-
-# バリデーション用の上限値
-# 異常値（ブラウザのバグ、悪意あるリクエスト等）を除外するための閾値
-_WEB_VITAL_MAX_VALUES: dict[str, float] = {
-    "LCP": 60_000,  # ms
-    "FCP": 60_000,  # ms
-    "INP": 30_000,  # ms — 実測データで 30s 超は外れ値（バックグラウンドタブ等）
-    "TTFB": 60_000,  # ms
-    "CLS": 5.0,  # unitless
-}
-_CLIENT_PERF_MAX_MS = 120_000  # Navigation Timing 系メトリクスの上限 (ms)
-
-
-def _date_range(date_str: str) -> tuple[str, str]:
-    """日付文字列から recorded_at の範囲条件用の開始・終了を返す。
-
-    date(recorded_at) = ? の代わりに recorded_at >= ? AND recorded_at < ? を使うことで
-    インデックスを活用できるようにする。
-    """
-    d = date.fromisoformat(date_str)
-    next_d = d + timedelta(days=1)
-    return f"{d.isoformat()}T00:00:00", f"{next_d.isoformat()}T00:00:00"
-
-
-def _date_gte(date_str: str) -> str:
-    """date(recorded_at) >= ? の代わりに使う recorded_at の下限値を返す。"""
-    return f"{date_str}T00:00:00"
-
-
-def _date_lt(date_str: str) -> str:
-    """date(recorded_at) < ? の代わりに使う recorded_at の上限値を返す。"""
-    return f"{date_str}T00:00:00"
-
-
-def _filter_web_vital_values(
-    metric_name: str,
-    rows: list[tuple],
-) -> tuple[list[float], list[str]]:
-    """既存データから異常値を除外して values と ratings を返す。
-
-    入力バリデーション導入前に DB に保存された異常値への防御。
-    """
-    max_value = _WEB_VITAL_MAX_VALUES.get(metric_name, 60_000)
-    values: list[float] = []
-    ratings: list[str] = []
-    for row in rows:
-        v = row[0]
-        if v < 0 or v > max_value:
-            continue
-        values.append(v)
-        ratings.append(row[1])
-    return values, ratings
-
-
-@dataclass(frozen=True)
-class ClientPerfRaw:
-    """Raw client performance data."""
-
-    device_type: DeviceType
-    ttfb_ms: float | None
-    dom_interactive_ms: float | None
-    dom_complete_ms: float | None
-    load_event_ms: float | None
-    page_path: str | None
-    user_agent: str | None
-
-    @classmethod
-    def parse(cls, data: dict) -> ClientPerfRaw | None:
-        """Parse from request JSON.
-
-        Returns None if all timing metrics are invalid or missing.
-        """
-
-        def _validate_timing(value: float | int | str | None) -> float | None:
-            if value is None:
-                return None
-            try:
-                v = float(value)
-            except (TypeError, ValueError):
-                return None
-            if math.isnan(v) or math.isinf(v) or v < 0 or v > _CLIENT_PERF_MAX_MS:
-                return None
-            return v
-
-        ttfb = _validate_timing(data.get("ttfb_ms"))
-        dom_interactive = _validate_timing(data.get("dom_interactive_ms"))
-        dom_complete = _validate_timing(data.get("dom_complete_ms"))
-        load_event = _validate_timing(data.get("load_event_ms"))
-
-        if ttfb is None and dom_interactive is None and dom_complete is None and load_event is None:
-            logger.debug("Client perf data rejected: all timing metrics invalid or missing")
-            return None
-
-        return cls(
-            device_type=data.get("device_type", "desktop"),
-            ttfb_ms=ttfb,
-            dom_interactive_ms=dom_interactive,
-            dom_complete_ms=dom_complete,
-            load_event_ms=load_event,
-            page_path=data.get("page_path"),
-            user_agent=data.get("user_agent"),
-        )
-
-
-@dataclass(frozen=True)
-class ClientPerfDaily:
-    """Daily aggregated performance data (for boxplot)."""
-
-    date: str
-    device_type: DeviceType
-    metric_name: MetricName
-    min_value: float
-    q1_value: float
-    median_value: float
-    q3_value: float
-    max_value: float
-    avg_value: float
-    entry_count: int
-
-
-@dataclass(frozen=True)
-class BoxplotData:
-    """Boxplot data for a single metric."""
-
-    date: str
-    device_type: DeviceType
-    min_val: float
-    q1: float
-    median: float
-    q3: float
-    max_val: float
-    avg: float
-    count: int
-
-
-@dataclass(frozen=True)
-class WebVitalRaw:
-    """Raw Core Web Vital data."""
-
-    device_type: DeviceType
-    metric_name: WebVitalName
-    metric_value: float
-    rating: WebVitalRating
-    page_path: str | None
-
-    @classmethod
-    def parse(cls, data: dict, device_type: DeviceType) -> WebVitalRaw | None:
-        """Parse from request JSON.
-
-        Returns None if validation fails (unknown metric, invalid value range, etc.).
-        """
-        name = data.get("name")
-        value = data.get("value")
-        rating = data.get("rating")
-        page_path = data.get("page_path")
-
-        if name not in ("LCP", "CLS", "INP", "FCP", "TTFB"):
-            return None
-        if value is None or rating is None:
-            return None
-        if rating not in ("good", "needs-improvement", "poor"):
-            return None
-
-        try:
-            float_value = float(value)
-        except (TypeError, ValueError):
-            return None
-
-        if math.isnan(float_value) or math.isinf(float_value) or float_value < 0:
-            logger.debug("Web vital %s rejected: invalid value %s", name, value)
-            return None
-
-        max_value = _WEB_VITAL_MAX_VALUES.get(name, 60_000)
-        if float_value > max_value:
-            logger.debug("Web vital %s rejected: value %.2f exceeds max %.0f", name, float_value, max_value)
-            return None
-
-        return cls(
-            device_type=device_type,
-            metric_name=name,
-            metric_value=float_value,
-            rating=rating,
-            page_path=page_path,
-        )
-
-
-@dataclass(frozen=True)
-class WebVitalDaily:
-    """Daily aggregated Core Web Vital data."""
-
-    date: str
-    device_type: DeviceType
-    metric_name: WebVitalName
-    min_value: float
-    q1_value: float
-    median_value: float
-    q3_value: float
-    max_value: float
-    avg_value: float
-    entry_count: int
-    good_count: int
-    needs_improvement_count: int
-    poor_count: int
-
-
-@dataclass(frozen=True)
-class WebVitalBoxplotData:
-    """Boxplot data for Core Web Vitals with rating distribution."""
-
-    date: str
-    device_type: DeviceType
-    metric_name: WebVitalName
-    min_val: float
-    q1: float
-    median: float
-    q3: float
-    max_val: float
-    avg: float
-    count: int
-    good_pct: float
-    needs_improvement_pct: float
-    poor_pct: float
-
-
-# Mobile detection regex (simplified)
-_MOBILE_PATTERN = re.compile(
-    r"(android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)",
-    re.IGNORECASE,
+from ._client_metrics_sqlite_models import (
+    BoxplotData,
+    ClientPerfDaily,
+    ClientPerfRaw,
+    DeviceType,
+    MetricName,
+    WebVitalBoxplotData,
+    WebVitalDaily,
+    WebVitalName,
+    WebVitalRaw,
+    _date_gte,
+    _date_lt,
+    _date_range,
+    _filter_web_vital_values,
+    detect_device_type,
 )
 
-
-def detect_device_type(user_agent: str | None) -> DeviceType:
-    """Detect device type from User-Agent string."""
-    if user_agent is None:
-        return "desktop"
-    if _MOBILE_PATTERN.search(user_agent):
-        return "mobile"
-    return "desktop"
+logger = logging.getLogger(__name__)
 
 
 class ClientMetricsDB:

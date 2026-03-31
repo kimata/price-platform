@@ -7,22 +7,58 @@ from typing import Generic, TypeVar, cast
 
 import flask
 
-DependenciesT = TypeVar("DependenciesT")
 ConfigT = TypeVar("ConfigT")
 StoresT = TypeVar("StoresT")
+ServicesT = TypeVar("ServicesT")
+DependenciesT = TypeVar("DependenciesT")
+MetricsDbT = TypeVar("MetricsDbT")
+ClientMetricsDbT = TypeVar("ClientMetricsDbT")
+NotificationStoreT = TypeVar("NotificationStoreT")
+WebPushStoreT = TypeVar("WebPushStoreT")
 
 
 @dataclass(frozen=True)
-class AppDependencies(Generic[ConfigT, StoresT]):
+class AppServices(Generic[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]):
+    """Optional long-lived services used by Web APIs."""
+
+    metrics_db: MetricsDbT | None = None
+    client_metrics_db: ClientMetricsDbT | None = None
+    notification_store: NotificationStoreT | None = None
+    webpush_store: WebPushStoreT | None = None
+
+
+@dataclass(frozen=True)
+class AppDependencies(Generic[ConfigT, StoresT, ServicesT]):
     """Common dependency container shape for Flask apps."""
 
     config: ConfigT
     stores: StoresT
+    services: ServicesT
 
 
-def build_app_dependencies(config: ConfigT, stores: StoresT) -> AppDependencies[ConfigT, StoresT]:
+def build_app_services(
+    *,
+    metrics_db: MetricsDbT | None = None,
+    client_metrics_db: ClientMetricsDbT | None = None,
+    notification_store: NotificationStoreT | None = None,
+    webpush_store: WebPushStoreT | None = None,
+) -> AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]:
+    """Build an AppServices bundle."""
+    return AppServices(
+        metrics_db=metrics_db,
+        client_metrics_db=client_metrics_db,
+        notification_store=notification_store,
+        webpush_store=webpush_store,
+    )
+
+
+def build_app_dependencies(
+    config: ConfigT,
+    stores: StoresT,
+    services: ServicesT,
+) -> AppDependencies[ConfigT, StoresT, ServicesT]:
     """Build a generic app dependency container."""
-    return AppDependencies(config=config, stores=stores)
+    return AppDependencies(config=config, stores=stores, services=services)
 
 
 def install_dependencies(app: flask.Flask, extension_key: str, dependencies: DependenciesT) -> DependenciesT:

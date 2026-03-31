@@ -7,20 +7,25 @@ import price_platform.webapp
 
 
 def test_build_app_dependencies_returns_typed_container() -> None:
+    services = price_platform.webapp.build_app_services(metrics_db="metrics")
     dependencies = price_platform.webapp.build_app_dependencies(
         config={"name": "app"},
         stores={"price_store": "store"},
+        services=services,
     )
 
     assert dependencies.config == {"name": "app"}
     assert dependencies.stores == {"price_store": "store"}
+    assert dependencies.services.metrics_db == "metrics"
 
 
 def test_install_and_get_typed_dependencies() -> None:
     app = flask.Flask(__name__)
+    services = price_platform.webapp.build_app_services(metrics_db="metrics")
     dependencies = price_platform.webapp.build_app_dependencies(
         config={"name": "app"},
         stores={"price_store": "store"},
+        services=services,
     )
     price_platform.webapp.install_dependencies(app, "test.dependencies", dependencies)
 

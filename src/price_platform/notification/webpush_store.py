@@ -8,73 +8,19 @@ import pathlib
 import sqlite3
 from collections.abc import Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
-from typing import Protocol
 
 import my_lib.sqlite_util
 import my_lib.time
+from ._webpush_store_types import (
+    DeliveryLogEntry,
+    DeliveryStatus,
+    LockingMode,
+    SubscriptionFactory,
+    WebPushSubscriptionRecord,
+)
 
 logger = logging.getLogger(__name__)
-
-LockingMode = str
-
-
-class DeliveryStatus(Enum):
-    """Web Push delivery status."""
-
-    SENT = "sent"
-    FAILED = "failed"
-    EXPIRED = "expired"
-
-
-@dataclass(frozen=True)
-class WebPushSubscriptionRecord:
-    """Shared Web Push subscription shape."""
-
-    id: int
-    endpoint: str
-    p256dh_key: str
-    auth_key: str
-    group_filter: list[str] | None
-    event_type_filter: list[str] | None
-    product_filter: list[str] | None
-    created_at: datetime
-    last_used_at: datetime | None
-    is_active: bool
-
-
-@dataclass(frozen=True)
-class DeliveryLogEntry:
-    """Web Push delivery log entry."""
-
-    id: int
-    subscription_id: int
-    event_id: int
-    status: DeliveryStatus
-    sent_at: datetime
-    error_message: str | None
-
-
-class SubscriptionFactory(Protocol):
-    """Factory protocol for app-specific subscription records."""
-
-    def __call__(
-        self,
-        *,
-        id: int,
-        endpoint: str,
-        p256dh_key: str,
-        auth_key: str,
-        group_filter: list[str] | None,
-        event_type_filter: list[str] | None,
-        product_filter: list[str] | None,
-        created_at: datetime,
-        last_used_at: datetime | None,
-        is_active: bool,
-    ) -> WebPushSubscriptionRecord: ...
-
 
 class BaseWebPushStore:
     """SQLite-backed Web Push subscription store with configurable group column."""

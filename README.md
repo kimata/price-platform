@@ -32,8 +32,10 @@
 ## セットアップ
 
 ```bash
-pip install -e .
+uv sync
 ```
+
+`price-platform` はローカルの `../my-py-lib` を依存として参照する前提です。
 
 ### 依存関係
 

@@ -6,15 +6,23 @@ import logging
 import pathlib
 import sqlite3
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import my_lib.sqlite_util
 import my_lib.time
-
-# SQLite ロックモード型
-LockingMode = Literal["NORMAL", "EXCLUSIVE"]
+from ._metrics_sqlite_models import (
+    HEARTBEAT_TIMEOUT_SEC,
+    AmazonBatchStats,
+    CrawlSession,
+    CycleStats,
+    HeatmapEntry,
+    ItemCrawlStats,
+    LockingMode,
+    SessionStatus,
+    StoreAggregateStats,
+    StoreCrawlStats,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -22,182 +30,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-HEARTBEAT_TIMEOUT_SEC = 600  # 10分
-
-
-@dataclass(frozen=True)
-class CrawlSession:
-    """Crawl session data."""
-
-    id: int
-    started_at: datetime
-    last_heartbeat_at: datetime | None
-    ended_at: datetime | None
-    work_ended_at: datetime | None
-    duration_sec: float | None
-    # 処理アイテム数（ストア×製品の組み合わせ）
-    total_items: int
-    success_items: int
-    failed_items: int
-    # ユニークな製品数
-    total_products: int
-    success_products: int
-    # 巡回回数
-    round_count: int
-    # 現在巡回開始時の累計（今回処理数計算用）
-    round_start_product_count: int
-    round_start_store_count: int
-    # 最後の巡回完了時刻（1巡回あたりの時間計算用）
-    last_round_completed_at: datetime | None
-    exit_reason: str | None
-
-    @property
-    def is_running(self) -> bool:
-        """Check if session is still running (not ended and heartbeat is recent)."""
-        if self.ended_at is not None:
-            return False
-        # ended_at が None でも heartbeat が古い場合は稼働中とみなさない
-        return not self.is_timed_out
-
-    @property
-    def is_timed_out(self) -> bool:
-        """Check if session has timed out (heartbeat too old)."""
-        if self.ended_at is not None:
-            return False
-        if self.last_heartbeat_at is None:
-            return True
-        elapsed = (my_lib.time.now() - self.last_heartbeat_at).total_seconds()
-        return elapsed > HEARTBEAT_TIMEOUT_SEC
-
-    @property
-    def effective_exit_reason(self) -> str | None:
-        """Get the exit reason, including timeout detection."""
-        if self.exit_reason is not None:
-            return self.exit_reason
-        if self.is_timed_out:
-            return "timeout"
-        return None
-
-
-@dataclass(frozen=True)
-class StoreCrawlStats:
-    """Store-level crawl statistics."""
-
-    store_name: str
-    total_items: int
-    success_count: int
-    failed_count: int
-    total_duration_sec: float
-
-    @property
-    def success_rate(self) -> float:
-        """Calculate success rate (0.0-1.0)."""
-        if self.total_items == 0:
-            return 0.0
-        return self.success_count / self.total_items
-
-    @property
-    def avg_duration_sec(self) -> float:
-        """Calculate average duration per item."""
-        if self.success_count == 0:
-            return 0.0
-        return self.total_duration_sec / self.success_count
-
-
-@dataclass(frozen=True)
-class ItemCrawlStats:
-    """Item-level crawl statistics."""
-
-    id: int
-    session_id: int
-    store_name: str
-    product_id: str
-    started_at: datetime
-    duration_sec: float | None
-    success: bool
-    error_message: str | None
-
-
-@dataclass(frozen=True)
-class AmazonBatchStats:
-    """Amazon API batch statistics."""
-
-    id: int
-    session_id: int
-    started_at: datetime
-    duration_sec: float | None
-    product_count: int
-    success: bool
-    error_message: str | None
-
-
-@dataclass
-class CycleStats:
-    """Statistics for product catalog cycles within a session."""
-
-    completed_cycles: int  # 完了した巡回回数
-    cycle_duration_sec: float | None  # 1巡回あたりの時間（秒）
-    unique_product_count: int  # 処理したユニーク製品数
-    total_product_count: int  # 全製品数
-    current_cycle_products: int = 0  # 今回処理製品数
-    current_cycle_stores: int = 0  # 今回処理ストア数
-    total_item_count: int = 0  # 累計処理ストア数（リアルタイム）
-    cumulative_product_count: int = 0  # 累計処理製品数（延べ）
-
-
-@dataclass
-class SessionStatus:
-    """Current session status for API response."""
-
-    is_running: bool
-    session_id: int | None = None
-    started_at: datetime | None = None
-    last_heartbeat_at: datetime | None = None
-    # 処理アイテム数（ストア×製品の組み合わせ）
-    processed_items: int = 0
-    success_items: int = 0
-    failed_items: int = 0
-    # ユニークな製品数
-    processed_products: int = 0
-    success_products: int = 0
-    cycle_stats: CycleStats | None = None
-
-
-@dataclass
-class HeatmapEntry:
-    """Heatmap entry for a single time slot (30-minute intervals).
-
-    Uses item_crawl_stats for real-time updates, including running sessions.
-    """
-
-    date: str
-    slot: int  # 0-47 (30-minute intervals: 0 = 00:00-00:30, 1 = 00:30-01:00, ...)
-    item_count: int  # Number of items processed in this slot
-    success_count: int  # Number of successful items
-    failed_count: int  # Number of failed items
-    total_duration_sec: float
-
-    @property
-    def success_rate(self) -> float:
-        """Calculate success rate (0.0-1.0)."""
-        if self.item_count == 0:
-            return 0.0
-        return self.success_count / self.item_count
-
-
-@dataclass
-class StoreAggregateStats:
-    """Aggregated statistics for a store across all sessions."""
-
-    store_name: str
-    total_sessions: int
-    total_items: int
-    success_count: int
-    failed_count: int
-    total_duration_sec: float
-    avg_duration_sec: float
-    success_rate: float
-    durations: list[float] = field(default_factory=list)
 
 
 class MetricsDB:
@@ -918,4 +750,3 @@ class MetricsDB:
             success=bool(r["success"]),
             error_message=r["error_message"],
         )
-

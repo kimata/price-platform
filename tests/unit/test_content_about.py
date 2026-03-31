@@ -22,8 +22,8 @@ def test_load_about_content_parses_loaded_data(monkeypatch, tmp_path: Path) -> N
     schema_file.write_text("dummy")
 
     monkeypatch.setattr(
-        price_platform.content.about.my_lib.config,
-        "load",
+        price_platform.content.about.price_platform._adapters,
+        "load_yaml_config",
         lambda *_args, **_kwargs: {
             "author": {"name": "Kimata", "icon": "/icon.png"},
             "title": "About",

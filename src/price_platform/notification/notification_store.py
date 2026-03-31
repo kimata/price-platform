@@ -6,72 +6,24 @@ import logging
 import pathlib
 import sqlite3
 from contextlib import contextmanager
-from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any
 
 import my_lib.sqlite_util
 import my_lib.time
-
-# SQLite locking mode type
-LockingMode = Literal["NORMAL", "EXCLUSIVE"]
+from ._notification_store_types import (
+    LockingMode,
+    NotificationItem,
+    NotificationStatus,
+    RateLimitState,
+    SupportsNotificationStoreConfig,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
-
-class SupportsNotificationStoreConfig(Protocol):
-    """Protocol for app configs that expose notification store settings."""
-
-    notification: Any
-
-    @property
-    def schema_dir(self) -> pathlib.Path: ...
-
-    def get_absolute_path(self, relative_path: pathlib.Path) -> pathlib.Path:
-        """Resolve a config-relative path."""
-        ...
-
-
-class NotificationStatus(Enum):
-    """Notification posting status."""
-
-    PENDING = "pending"
-    POSTED = "posted"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-
-
-@dataclass(frozen=True)
-class NotificationItem:
-    """Notification queue item."""
-
-    id: int
-    event_id: int
-    event_type: str
-    product_id: str
-    store: str
-    price: int
-    url: str | None
-    message: str
-    created_at: datetime
-    status: NotificationStatus
-    posted_at: datetime | None = None
-    error_message: str | None = None
-    retry_count: int = 0
-
-
-@dataclass(frozen=True)
-class RateLimitState:
-    """Persisted rate limit state for Twitter API."""
-
-    next_available_at: datetime  # When posting becomes available
-    recorded_at: datetime  # When this state was recorded
-    app_reset: datetime  # App rate limit reset time
-    user_reset: datetime  # User rate limit reset time
 
 
 class NotificationStore:

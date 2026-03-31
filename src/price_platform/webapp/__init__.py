@@ -19,7 +19,15 @@ from .app_factory import (
     register_blueprints,
     register_optional_blueprints,
 )
-from .dependencies import AppDependencies, build_app_dependencies, get_dependencies, get_typed_dependencies, install_dependencies
+from .dependencies import (
+    AppDependencies,
+    AppServices,
+    build_app_dependencies,
+    build_app_services,
+    get_dependencies,
+    get_typed_dependencies,
+    install_dependencies,
+)
 from .cors import extract_origin, get_cors_origins, is_allowed_request_origin
 from .headers import CacheRule, apply_common_headers
 from .request_context import install_request_hooks
@@ -29,7 +37,9 @@ __all__ = [
     "CacheRule",
     "CommonRoutesSettings",
     "AppDependencies",
+    "AppServices",
     "build_app_dependencies",
+    "build_app_services",
     "get_dependencies",
     "get_typed_dependencies",
     "install_dependencies",

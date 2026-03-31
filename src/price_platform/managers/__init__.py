@@ -6,12 +6,7 @@ for crawl-based price tracking applications.
 
 from .crawl_runtime import CrawlRuntime, managed_crawl_runtime
 from .lifecycle_manager import LifecycleManager
-from .liveness_manager import (
-    LivenessManager,
-    get_liveness_manager,
-    init_liveness_manager,
-    set_liveness_manager,
-)
+from .liveness_manager import LivenessManager
 from .metrics_manager import MetricsDBProtocol, MetricsManager
 
 __all__ = [
@@ -20,8 +15,5 @@ __all__ = [
     "MetricsDBProtocol",
     "MetricsManager",
     "CrawlRuntime",
-    "get_liveness_manager",
-    "init_liveness_manager",
     "managed_crawl_runtime",
-    "set_liveness_manager",
 ]

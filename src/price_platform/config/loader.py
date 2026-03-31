@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
 
-import my_lib.config
+import price_platform._adapters
 
 from .models import (
     AppConfig,
@@ -89,8 +89,8 @@ def load_app_config_for(
         config_path = os.environ.get(spec.env_var_name, "config.yaml")
 
     try:
-        data = my_lib.config.load(config_path)
-    except my_lib.config.ConfigFileNotFoundError as exc:
+        data = price_platform._adapters.load_yaml_config(config_path)
+    except price_platform._adapters.ConfigFileNotFoundError as exc:
         msg = f"Configuration file not found: {config_path}"
         raise FileNotFoundError(msg) from exc
 
