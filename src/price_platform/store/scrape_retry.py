@@ -40,8 +40,8 @@ def run_scrape_with_retry(
     max_attempts: int,
     retry_delay_sec: float,
     item_timing: ItemTimingProtocol | None = None,
-    on_timeout: Callable[[], None] | None = None,
-    on_success: Callable[[], None] | None = None,
+    on_timeout: Callable[[], object] | None = None,
+    on_success: Callable[[], object] | None = None,
 ) -> ScrapeRetryOutcome[PriceT]:
     """Run a scrape function with shared retry and metrics behavior."""
     last_error: Exception | None = None

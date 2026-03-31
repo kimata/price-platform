@@ -7,7 +7,7 @@ import logging
 import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, ClassVar, Generic, Protocol, TypeVar
 
 from ..config import WebPushConfig
 
@@ -55,9 +55,9 @@ class WebPushStoreProtocol(Protocol[SubscriptionT]):
 class DeliveryStatusProtocol(Protocol):
     """Enum-like delivery status surface required by the sender."""
 
-    SENT: Any
-    FAILED: Any
-    EXPIRED: Any
+    SENT: ClassVar[Any]
+    FAILED: ClassVar[Any]
+    EXPIRED: ClassVar[Any]
 
 
 def build_detail_url(base_url: str, product_id: str, selection_key: str | None = None) -> str:

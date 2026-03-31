@@ -251,70 +251,66 @@ class ClientMetricsWebVitalsReadMixin:
         cutoff_str = cutoff.date().isoformat()
         result: dict[str, dict[DeviceType, dict]] = {}
 
-        with self._lock:
-            conn = sqlite3.connect(self.db_path)
-            try:
-                for metric_name in metric_names:
-                    result[metric_name] = {}
-                    for device_type in device_types:
-                        cutoff_ts = _date_gte(cutoff_str)
-                        cursor = conn.execute(
-                            """
-                            SELECT metric_value, rating
-                            FROM web_vitals_raw
-                            WHERE recorded_at >= ?
-                              AND device_type = ?
-                              AND metric_name = ?
-                            """,
-                            (cutoff_ts, device_type, metric_name),
-                        )
-                        rows = cursor.fetchall()
-                        values, ratings = _filter_web_vital_values(metric_name, rows) if rows else ([], [])
-                        if not values:
-                            result[metric_name][device_type] = {
-                                "count": 0,
-                                "median": None,
-                                "p75": None,
-                                "good_pct": 0,
-                                "needs_improvement_pct": 0,
-                                "poor_pct": 0,
-                                "latest_sample_at": None,
-                            }
-                            continue
-
-                        latest_cursor = conn.execute(
-                            """
-                            SELECT MAX(recorded_at)
-                            FROM web_vitals_raw
-                            WHERE recorded_at >= ?
-                              AND device_type = ?
-                              AND metric_name = ?
-                            """,
-                            (cutoff_ts, device_type, metric_name),
-                        )
-                        latest_row = latest_cursor.fetchone()
-                        latest_sample_at = latest_row[0] if latest_row else None
-
-                        sorted_values = sorted(values)
-                        n = len(sorted_values)
-                        median_val = statistics.median(sorted_values)
-                        p75_idx = int(n * 0.75)
-                        p75_val = sorted_values[p75_idx] if p75_idx < n else sorted_values[-1]
-                        good_count = sum(1 for r in ratings if r == "good")
-                        ni_count = sum(1 for r in ratings if r == "needs-improvement")
-                        poor_count = sum(1 for r in ratings if r == "poor")
-
+        with self._get_connection() as conn:
+            for metric_name in metric_names:
+                result[metric_name] = {}
+                for device_type in device_types:
+                    cutoff_ts = _date_gte(cutoff_str)
+                    cursor = conn.execute(
+                        """
+                        SELECT metric_value, rating
+                        FROM web_vitals_raw
+                        WHERE recorded_at >= ?
+                          AND device_type = ?
+                          AND metric_name = ?
+                        """,
+                        (cutoff_ts, device_type, metric_name),
+                    )
+                    rows = cursor.fetchall()
+                    values, ratings = _filter_web_vital_values(metric_name, rows) if rows else ([], [])
+                    if not values:
                         result[metric_name][device_type] = {
-                            "count": n,
-                            "median": round(median_val, 2),
-                            "p75": round(p75_val, 2),
-                            "good_pct": round(good_count / n * 100, 1),
-                            "needs_improvement_pct": round(ni_count / n * 100, 1),
-                            "poor_pct": round(poor_count / n * 100, 1),
-                            "latest_sample_at": latest_sample_at,
+                            "count": 0,
+                            "median": None,
+                            "p75": None,
+                            "good_pct": 0,
+                            "needs_improvement_pct": 0,
+                            "poor_pct": 0,
+                            "latest_sample_at": None,
                         }
-            finally:
-                conn.close()
+                        continue
+
+                    latest_cursor = conn.execute(
+                        """
+                        SELECT MAX(recorded_at)
+                        FROM web_vitals_raw
+                        WHERE recorded_at >= ?
+                          AND device_type = ?
+                          AND metric_name = ?
+                        """,
+                        (cutoff_ts, device_type, metric_name),
+                    )
+                    latest_row = latest_cursor.fetchone()
+                    latest_sample_at = latest_row[0] if latest_row else None
+
+                    sorted_values = sorted(values)
+                    n = len(sorted_values)
+                    median_val = statistics.median(sorted_values)
+                    p75_idx = int(n * 0.75)
+                    p75_val = sorted_values[p75_idx] if p75_idx < n else sorted_values[-1]
+                    good_count = sum(1 for r in ratings if r == "good")
+                    ni_count = sum(1 for r in ratings if r == "needs-improvement")
+                    poor_count = sum(1 for r in ratings if r == "poor")
+
+                    result[metric_name][device_type] = {
+                        "count": n,
+                        "median": round(median_val, 2),
+                        "p75": round(p75_val, 2),
+                        "good_pct": round(good_count / n * 100, 1),
+                        "needs_improvement_pct": round(ni_count / n * 100, 1),
+                        "poor_pct": round(poor_count / n * 100, 1),
+                        "latest_sample_at": latest_sample_at,
+                    }
 
         return result
 
@@ -322,18 +318,14 @@ class ClientMetricsWebVitalsReadMixin:
         cutoff = clock.now() - timedelta(days=retention_days)
         cutoff_str = cutoff.date().isoformat()
 
-        with self._lock:
-            conn = sqlite3.connect(self.db_path)
-            try:
-                cursor = conn.execute(
-                    """
-                    DELETE FROM web_vitals_raw
-                    WHERE recorded_at < ?
-                    """,
-                    (_date_lt(cutoff_str),),
-                )
-                deleted = cursor.rowcount
-                conn.commit()
-                return deleted
-            finally:
-                conn.close()
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM web_vitals_raw
+                WHERE recorded_at < ?
+                """,
+                (_date_lt(cutoff_str),),
+            )
+            deleted = cursor.rowcount
+            conn.commit()
+            return deleted
