@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import urllib.parse
 
 
@@ -26,14 +27,41 @@ def get_cors_origins(external_url: str) -> list[str]:
     return [origin]
 
 
+def _is_local_origin(origin: str) -> bool:
+    """Return True if *origin* points to localhost or a private IP."""
+    parsed = urllib.parse.urlparse(origin)
+    host = parsed.hostname or ""
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
 def is_allowed_request_origin(
     *,
     allowed_origins: list[str] | tuple[str, ...],
     origin: str | None,
     referer: str | None,
 ) -> bool:
-    """Return whether a request origin or referer matches the allowed origin list."""
+    """Return whether a request origin or referer matches the allowed origin list.
+
+    If *allowed_origins* is empty, any request that carries an Origin or
+    Referer header is accepted (presence-only check).  This preserves
+    backward-compatible behaviour for environments where external_url is
+    not configured.
+
+    Requests from localhost or private-IP origins are always accepted
+    when an Origin header is present (CI / E2E environments).
+    """
+    if not allowed_origins:
+        return bool(origin or referer)
+
     if origin and origin in allowed_origins:
+        return True
+
+    if origin and _is_local_origin(origin):
         return True
 
     referer_origin = extract_origin(referer)
