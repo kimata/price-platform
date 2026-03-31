@@ -9,7 +9,6 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "flask>=3.0.0",
     "flask-cors>=6.0.0",
-    "my-lib",
     "PyJWT>=2.8.0",
     "requests>=2.32.0",
     "selenium>=4.0.0",
@@ -20,6 +19,7 @@ authors = [
 
 [dependency-groups]
 dev = [
+    "my-lib @ git+https://github.com/kimata/my-py-lib",
     "pytest>=9.0.0",
 ]
 
@@ -35,9 +35,6 @@ allow-direct-references = true
 
 [tool.uv]
 default-groups = ["dev"]
-
-[tool.uv.sources]
-my-lib = { path = "../my-py-lib", editable = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
