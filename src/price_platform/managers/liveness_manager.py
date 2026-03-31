@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Default liveness update interval in seconds
 DEFAULT_UPDATE_INTERVAL = 30
+_liveness_manager: LivenessManager | None = None
 
 
 def _default_update_fn(path: pathlib.Path) -> None:
@@ -91,3 +92,35 @@ class LivenessManager:
         self.update()
 
         return True
+
+
+def get_liveness_manager() -> LivenessManager | None:
+    """Return the process-global liveness manager."""
+    return _liveness_manager
+
+
+def set_liveness_manager(manager: LivenessManager | None) -> None:
+    """Replace the process-global liveness manager."""
+    global _liveness_manager
+    _liveness_manager = manager
+
+
+def init_liveness_manager(
+    *,
+    liveness_file: pathlib.Path | None,
+    update_interval_sec: int = DEFAULT_UPDATE_INTERVAL,
+    update_fn: Callable[[pathlib.Path], None] = _default_update_fn,
+) -> LivenessManager:
+    """Create and register the process-global liveness manager."""
+    manager = LivenessManager(
+        liveness_file=liveness_file,
+        update_interval_sec=update_interval_sec,
+        update_fn=update_fn,
+    )
+    set_liveness_manager(manager)
+    return manager
+
+
+def _reset_liveness_manager() -> None:
+    """Clear the process-global liveness manager for tests."""
+    set_liveness_manager(None)
