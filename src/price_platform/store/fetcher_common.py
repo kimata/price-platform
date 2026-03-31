@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 ProductT = TypeVar("ProductT")
 ScrapedPriceT = TypeVar("ScrapedPriceT")
+StoreT = TypeVar("StoreT")
 
 
 class _SeleniumConfigLike(Protocol):
@@ -224,10 +225,10 @@ def filter_by_color_label(
     return filtered
 
 
-class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT]):
+class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT, StoreT]):
     """Shared HTTP/WebDriver fetcher base."""
 
-    store_type: object
+    store_type: StoreT
     MAX_SEARCH_RESULTS = 20
 
     def __init__(self, config: ConfigT, *, webdriver_profile_name: str) -> None:
