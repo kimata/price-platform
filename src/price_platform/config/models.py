@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import my_lib.store.amazon.credentials
+import my_lib.store.rakuten.credentials
+import my_lib.store.yahoo.credentials
+
 
 def _resolve_path(value: str | Path, *, base_dir: Path) -> Path:
     path = Path(value)
@@ -15,13 +19,8 @@ def _resolve_path(value: str | Path, *, base_dir: Path) -> Path:
 
 
 @dataclass(frozen=True)
-class AmazonStoreConfig:
+class AmazonStoreConfig(my_lib.store.amazon.credentials.AmazonApiConfig):
     """Amazon API credentials."""
-
-    credential_id: str
-    credential_secret: str
-    associate: str
-    version: str = "3.3"
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> "AmazonStoreConfig":
@@ -34,11 +33,8 @@ class AmazonStoreConfig:
 
 
 @dataclass(frozen=True)
-class RakutenStoreConfig:
+class RakutenStoreConfig(my_lib.store.rakuten.credentials.RakutenApiConfig):
     """Rakuten API credentials."""
-
-    application_id: str
-    affiliate_id: str | None = None
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> "RakutenStoreConfig":
@@ -49,13 +45,8 @@ class RakutenStoreConfig:
 
 
 @dataclass(frozen=True)
-class YahooStoreConfig:
+class YahooStoreConfig(my_lib.store.yahoo.credentials.YahooApiConfig):
     """Yahoo Shopping API credentials."""
-
-    client_id: str
-    secret: str
-    affiliate_type: str | None = None
-    affiliate_id: str | None = None
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> "YahooStoreConfig":
