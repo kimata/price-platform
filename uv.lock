@@ -1179,6 +1179,7 @@ dependencies = [
     { name = "beautifulsoup4" },
     { name = "flask" },
     { name = "flask-cors" },
+    { name = "my-lib" },
     { name = "pyjwt" },
     { name = "requests" },
     { name = "selenium" },
@@ -1186,7 +1187,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "my-lib" },
     { name = "pytest" },
 ]
 
@@ -1196,16 +1196,14 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "flask-cors", specifier = ">=6.0.0" },
+    { name = "my-lib", git = "https://github.com/kimata/my-py-lib" },
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "selenium", specifier = ">=4.0.0" },
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "my-lib", git = "https://github.com/kimata/my-py-lib" },
-    { name = "pytest", specifier = ">=9.0.0" },
-]
+dev = [{ name = "pytest", specifier = ">=9.0.0" }]
 
 [[package]]
 name = "propcache"

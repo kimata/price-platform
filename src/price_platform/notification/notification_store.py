@@ -473,7 +473,7 @@ def open_existing_notification_store(config: SupportsNotificationStoreConfig) ->
     db_path = config.get_absolute_path(notification_config.db_path)
     if not db_path.exists():
         return None
-    return open_notification_store(db_path, config.schema_dir)
+    return open_notification_store(db_path)
 
 
 # Global instance cache

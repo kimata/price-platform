@@ -35,7 +35,7 @@
 uv sync
 ```
 
-`price-platform` はローカルの `../my-py-lib` を依存として参照する前提です。
+`price-platform` は `my-lib` を runtime dependency として利用します。ローカル開発では `../my-py-lib` を参照しても構いません。
 
 ### `my-py-lib` との境界
 
@@ -76,7 +76,7 @@ uv sync
 - `sqlite_price_events.schema`
 - `sqlite_webpush.schema`
 
-consumer app 側の `schema/` は override か legacy migration 用にだけ残せますが、baseline schema と migration の owner は `price-platform` です。
+consumer app 側の `schema/` は override か legacy migration 用にだけ残せますが、baseline schema と migration の owner は `price-platform` です。`schema_dir` override は段階的に廃止する前提です。
 
 共通化のため、DB 列名も canonical 名に寄せています。
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+import warnings
 
 
 def _resolve_path(value: str | Path, *, base_dir: Path) -> Path:
@@ -380,6 +381,11 @@ class AppConfig:
 
     @property
     def schema_dir(self) -> Path:
+        warnings.warn(
+            "AppConfig.schema_dir is deprecated; bundled price-platform schemas are the default owner.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._base_dir / "schema"
 
     @property

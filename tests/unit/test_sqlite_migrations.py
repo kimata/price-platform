@@ -3,8 +3,11 @@ from __future__ import annotations
 import pathlib
 import sqlite3
 
+import pytest
+
 from price_platform.notification.webpush_store import BaseWebPushStore
 from price_platform.schema_registry import bundled_schema_dir, resolve_schema_path
+from price_platform.sqlite_store import SQLiteStoreBase
 from price_platform.store.price_event_store import BasePriceEventStore
 
 
@@ -55,10 +58,13 @@ def test_price_event_store_canonicalizes_selection_column_once(tmp_path: pathlib
     with sqlite3.connect(db_path) as conn:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(price_events)").fetchall()}
         migrations = {row[0] for row in conn.execute("SELECT name FROM schema_migrations").fetchall()}
+        metadata = dict(conn.execute("SELECT key, value FROM schema_metadata").fetchall())
 
     assert "selection_key" in columns
     assert "color_key" not in columns
     assert "canonicalize-price-events-selection" in migrations
+    assert metadata["schema_name"] == "sqlite_price_events.schema"
+    assert metadata["schema_sha256"]
 
 
 def test_webpush_store_renames_legacy_columns(tmp_path: pathlib.Path) -> None:
@@ -102,12 +108,15 @@ def test_webpush_store_renames_legacy_columns(tmp_path: pathlib.Path) -> None:
     with sqlite3.connect(db_path) as conn:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(webpush_subscriptions)").fetchall()}
         migrations = {row[0] for row in conn.execute("SELECT name FROM schema_migrations").fetchall()}
+        metadata = dict(conn.execute("SELECT key, value FROM schema_metadata").fetchall())
 
     assert "group_filter" in columns
     assert "product_filter" in columns
     assert "maker_filter" not in columns
     assert "item_filter" not in columns
     assert "canonicalize-webpush-filters" in migrations
+    assert metadata["schema_name"] == "sqlite_webpush.schema"
+    assert metadata["schema_sha256"]
 
 
 def test_schema_registry_prefers_override_but_has_bundled_defaults(tmp_path: pathlib.Path) -> None:
@@ -116,5 +125,31 @@ def test_schema_registry_prefers_override_but_has_bundled_defaults(tmp_path: pat
     override_path = schema_dir / "sqlite_notification.schema"
     _write_schema(override_path, "CREATE TABLE IF NOT EXISTS override_marker (id INTEGER);")
 
-    assert resolve_schema_path("sqlite_notification.schema", schema_dir=schema_dir) == override_path
+    with pytest.deprecated_call(match="schema_dir overrides are deprecated"):
+        assert resolve_schema_path("sqlite_notification.schema", schema_dir=schema_dir) == override_path
     assert resolve_schema_path("sqlite_notification.schema") == bundled_schema_dir() / "sqlite_notification.schema"
+
+
+def test_sqlite_store_base_can_delay_initialization(tmp_path: pathlib.Path) -> None:
+    schema_path = tmp_path / "dummy.schema"
+    _write_schema(schema_path, "CREATE TABLE IF NOT EXISTS demo (id INTEGER PRIMARY KEY);")
+    db_path = tmp_path / "dummy.db"
+
+    class _DummyStore(SQLiteStoreBase):
+        pass
+
+    store = _DummyStore(
+        db_path=db_path,
+        schema_path=schema_path,
+        auto_initialize=False,
+    )
+
+    assert not db_path.exists()
+
+    store.initialize()
+
+    with sqlite3.connect(db_path) as conn:
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+
+    assert "demo" in tables
+    assert "schema_metadata" in tables
