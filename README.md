@@ -37,6 +37,35 @@ uv sync
 
 `price-platform` はローカルの `../my-py-lib` を依存として参照する前提です。
 
+### `my-py-lib` との境界
+
+`price-platform` から直接参照してよい `my-py-lib` の低レベル API は以下に限定します。
+
+- `my_lib.sqlite_util`
+  - `connect`
+  - `init_schema_from_file`
+  - `exec_schema_from_file`
+  - `recover`
+- `my_lib.time`
+  - `get_tz`
+  - `get_zoneinfo`
+  - `now`
+- `my_lib.browser_manager`
+  - `BrowserManager`
+- `my_lib.selenium_util`
+  - `create_driver`
+  - `quit_driver_gracefully`
+  - `clear_cache`
+- `my_lib.config`
+  - `load`
+- `my_lib.webapp.config`
+  - `show_handler_list`
+- `my_lib.webapp.event`
+  - `blueprint`
+  - `notify_event`
+
+これら以外の `my_lib` 依存は `price_platform.platform.*` の facade を追加してから使います。`price-platform` 側で同等の低レベル実装を再実装しないことも方針です。
+
 ### 依存関係
 
 - Python >= 3.11

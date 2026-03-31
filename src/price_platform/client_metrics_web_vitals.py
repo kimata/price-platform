@@ -1,4 +1,4 @@
-"""Core Web Vitals helpers for client metrics."""
+"""Core Web Vitals read/write helpers for client metrics."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from .platform import clock
 logger = logging.getLogger(__name__)
 
 
-class ClientMetricsWebVitalsMixin:
+class ClientMetricsWebVitalsWriteMixin:
     def save_web_vital(self, data: WebVitalRaw) -> None:
         now = clock.now()
         now_naive = now.replace(tzinfo=None)
@@ -134,6 +134,7 @@ class ClientMetricsWebVitalsMixin:
 
         return aggregated_count
 
+class ClientMetricsWebVitalsReadMixin:
     def get_web_vitals_daily(
         self,
         metric_name: WebVitalName,
