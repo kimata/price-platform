@@ -7,12 +7,13 @@ import statistics
 from datetime import timedelta
 
 from ._client_metrics_sqlite_models import BoxplotData, DeviceType, MetricName, _date_range
+from ._sqlite_protocols import ClientMetricsBoxplotProvider
 from .platform import clock
 
 
 class ClientMetricsBoxplotMixin:
     def get_daily_boxplot_data(
-        self,
+        self: ClientMetricsBoxplotProvider,
         metric_name: MetricName,
         days: int = 30,
     ) -> list[BoxplotData]:
@@ -73,7 +74,7 @@ class ClientMetricsBoxplotMixin:
         return result
 
     def _compute_stats_for_date(
-        self,
+        self: ClientMetricsBoxplotProvider,
         conn: sqlite3.Connection,
         date_str: str,
         metric_name: MetricName,
@@ -118,7 +119,7 @@ class ClientMetricsBoxplotMixin:
         )
 
     def get_realtime_stats_for_dates(
-        self,
+        self: ClientMetricsBoxplotProvider,
         metric_name: MetricName,
         dates: list[str],
     ) -> list[BoxplotData]:
@@ -135,7 +136,7 @@ class ClientMetricsBoxplotMixin:
         return result
 
     def get_today_realtime_stats(
-        self,
+        self: ClientMetricsBoxplotProvider,
         metric_name: MetricName,
     ) -> dict[DeviceType, BoxplotData | None]:
         today = clock.now().date().isoformat()

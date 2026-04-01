@@ -5,16 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import my_lib.time
+import my_lib.platform.time
 
 
 def get_tz() -> str:
-    return my_lib.time.get_tz()
+    return my_lib.platform.time.get_tz()
 
 
 def get_zoneinfo() -> ZoneInfo:
-    return my_lib.time.get_zoneinfo()
+    return my_lib.platform.time.get_zoneinfo()
 
 
 def now() -> datetime:
-    return my_lib.time.now()
+    return my_lib.platform.time.now()

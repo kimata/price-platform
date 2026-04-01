@@ -29,16 +29,18 @@ class MigrationRunner:
     def __init__(self, migrations: Sequence[Migration]):
         self._migrations = tuple(migrations)
 
-    def apply(self, conn: sqlite3.Connection) -> None:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-                name TEXT PRIMARY KEY,
-                applied_at TEXT NOT NULL
-            )
-            """
-        )
+    def planned_names(self) -> tuple[str, ...]:
+        return tuple(migration.name for migration in self._migrations)
+
+    def pending_names(self, conn: sqlite3.Connection) -> tuple[str, ...]:
+        self._ensure_tracking_table(conn)
         applied = {row[0] for row in conn.execute("SELECT name FROM schema_migrations").fetchall()}
+        return tuple(migration.name for migration in self._migrations if migration.name not in applied)
+
+    def apply(self, conn: sqlite3.Connection) -> tuple[str, ...]:
+        self._ensure_tracking_table(conn)
+        applied = {row[0] for row in conn.execute("SELECT name FROM schema_migrations").fetchall()}
+        applied_now: list[str] = []
         for migration in self._migrations:
             if migration.name in applied:
                 continue
@@ -48,6 +50,19 @@ class MigrationRunner:
                 (migration.name, clock.now().isoformat()),
             )
             logger.info("Applied migration %s", migration.name)
+            applied_now.append(migration.name)
+        return tuple(applied_now)
+
+    @staticmethod
+    def _ensure_tracking_table(conn: sqlite3.Connection) -> None:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                name TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            )
+            """
+        )
 
 
 @dataclass(frozen=True)
@@ -90,6 +105,20 @@ class SQLiteBootstrapper:
             conn.row_factory = sqlite3.Row
             self._record_schema_metadata(conn)
             self._migration_runner.apply(conn)
+
+    @property
+    def schema_metadata(self) -> SchemaMetadata:
+        return self._schema_metadata
+
+    @property
+    def db_path(self) -> Path:
+        return self._db_path
+
+    def pending_migrations(self) -> tuple[str, ...]:
+        if not self._db_path.exists():
+            return self._migration_runner.planned_names()
+        with platform_sqlite.connect(self._db_path, locking_mode=self._locking_mode) as conn:
+            return self._migration_runner.pending_names(conn)
 
     def _record_schema_metadata(self, conn: sqlite3.Connection) -> None:
         conn.execute(

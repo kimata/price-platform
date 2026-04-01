@@ -17,13 +17,14 @@ from ._client_metrics_sqlite_models import (
     _date_range,
     _filter_web_vital_values,
 )
+from ._sqlite_protocols import ClientMetricsWebVitalsProvider, SQLiteConnectionProvider
 from .platform import clock
 
 logger = logging.getLogger(__name__)
 
 
 class ClientMetricsWebVitalsWriteMixin:
-    def save_web_vital(self, data: WebVitalRaw) -> None:
+    def save_web_vital(self: SQLiteConnectionProvider, data: WebVitalRaw) -> None:
         now = clock.now()
         now_naive = now.replace(tzinfo=None)
         with self._get_connection() as conn:
@@ -44,7 +45,7 @@ class ClientMetricsWebVitalsWriteMixin:
             )
             conn.commit()
 
-    def aggregate_web_vitals_daily(self, date: str) -> int:
+    def aggregate_web_vitals_daily(self: SQLiteConnectionProvider, date: str) -> int:
         metric_names: list[WebVitalName] = ["LCP", "CLS", "INP", "FCP", "TTFB"]
         device_types: list[DeviceType] = ["mobile", "desktop"]
         aggregated_count = 0
@@ -128,7 +129,7 @@ class ClientMetricsWebVitalsWriteMixin:
 
 class ClientMetricsWebVitalsReadMixin:
     def get_web_vitals_daily(
-        self,
+        self: ClientMetricsWebVitalsProvider,
         metric_name: WebVitalName,
         days: int = 30,
     ) -> list[WebVitalBoxplotData]:
@@ -189,7 +190,7 @@ class ClientMetricsWebVitalsReadMixin:
         return result
 
     def _compute_web_vital_stats_for_date(
-        self,
+        self: ClientMetricsWebVitalsProvider,
         conn: sqlite3.Connection,
         date_str: str,
         metric_name: WebVitalName,
@@ -244,7 +245,10 @@ class ClientMetricsWebVitalsReadMixin:
             poor_pct=(poor_count / n * 100) if n > 0 else 0,
         )
 
-    def get_web_vitals_summary(self, days: int = 7) -> dict[str, dict[DeviceType, dict]]:
+    def get_web_vitals_summary(
+        self: SQLiteConnectionProvider,
+        days: int = 7,
+    ) -> dict[str, dict[DeviceType, dict]]:
         metric_names: list[WebVitalName] = ["LCP", "CLS", "INP", "FCP", "TTFB"]
         device_types: list[DeviceType] = ["mobile", "desktop"]
         cutoff = clock.now() - timedelta(days=days)
@@ -314,7 +318,7 @@ class ClientMetricsWebVitalsReadMixin:
 
         return result
 
-    def cleanup_old_web_vitals(self, retention_days: int) -> int:
+    def cleanup_old_web_vitals(self: SQLiteConnectionProvider, retention_days: int) -> int:
         cutoff = clock.now() - timedelta(days=retention_days)
         cutoff_str = cutoff.date().isoformat()
 

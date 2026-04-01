@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
+from ._sqlite_protocols import MetricsRowMapper, SQLiteConnectionProvider
 from .platform import clock
 
 logger = logging.getLogger(__name__)
 
 
 class MetricsDBWriteMixin:
-    def start_session(self) -> int:
+    def start_session(self: SQLiteConnectionProvider) -> int:
         now = clock.now()
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -28,7 +29,7 @@ class MetricsDBWriteMixin:
             logger.info("Started metrics session %s", session_id)
             return session_id
 
-    def update_heartbeat(self, session_id: int) -> None:
+    def update_heartbeat(self: SQLiteConnectionProvider, session_id: int) -> None:
         now = clock.now()
         with self._get_connection() as conn:
             conn.execute(
@@ -42,7 +43,7 @@ class MetricsDBWriteMixin:
             conn.commit()
 
     def update_session_counts(
-        self,
+        self: SQLiteConnectionProvider,
         session_id: int,
         *,
         total_items: int,
@@ -63,7 +64,7 @@ class MetricsDBWriteMixin:
             )
             conn.commit()
 
-    def increment_round_count(self, session_id: int) -> int:
+    def increment_round_count(self: MetricsRowMapper, session_id: int) -> int:
         current_unique_products = self.get_unique_product_count_for_session(session_id)
         current_total_items = self.get_total_item_count_for_session(session_id)
         now = clock.now()
@@ -84,7 +85,7 @@ class MetricsDBWriteMixin:
             conn.commit()
             return row["round_count"] if row else 0
 
-    def mark_work_ended(self, session_id: int) -> None:
+    def mark_work_ended(self: SQLiteConnectionProvider, session_id: int) -> None:
         now = clock.now()
         with self._get_connection() as conn:
             conn.execute(
@@ -97,7 +98,7 @@ class MetricsDBWriteMixin:
             )
             conn.commit()
 
-    def end_session(self, session_id: int, exit_reason: str = "normal") -> None:
+    def end_session(self: SQLiteConnectionProvider, session_id: int, exit_reason: str = "normal") -> None:
         now = clock.now()
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT started_at FROM crawl_sessions WHERE id = ?", (session_id,))
@@ -116,7 +117,7 @@ class MetricsDBWriteMixin:
                 conn.commit()
                 logger.info("Ended metrics session %s: %s", session_id, exit_reason)
 
-    def close_interrupted_sessions(self) -> int:
+    def close_interrupted_sessions(self: SQLiteConnectionProvider) -> int:
         now = clock.now()
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -148,7 +149,7 @@ class MetricsDBWriteMixin:
             return closed_count
 
     def record_store_stats(
-        self,
+        self: SQLiteConnectionProvider,
         session_id: int,
         store_name: str,
         total_items: int,
@@ -173,7 +174,7 @@ class MetricsDBWriteMixin:
             conn.commit()
 
     def record_item_stats(
-        self,
+        self: SQLiteConnectionProvider,
         session_id: int,
         store_name: str,
         product_id: str,
@@ -194,7 +195,7 @@ class MetricsDBWriteMixin:
             conn.commit()
 
     def record_amazon_batch(
-        self,
+        self: SQLiteConnectionProvider,
         session_id: int,
         started_at: datetime,
         duration_sec: float | None,
@@ -213,7 +214,7 @@ class MetricsDBWriteMixin:
             )
             conn.commit()
 
-    def cleanup_old_records(self, days: int = 365) -> int:
+    def cleanup_old_records(self: SQLiteConnectionProvider, days: int = 365) -> int:
         cutoff = clock.now() - timedelta(days=days)
         total_deleted = 0
         with self._get_connection() as conn:

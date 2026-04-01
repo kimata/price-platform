@@ -17,19 +17,20 @@ from ._metrics_sqlite_models import (
     StoreAggregateStats,
     StoreCrawlStats,
 )
+from ._sqlite_protocols import MetricsRowMapper
 from .platform import clock
 
 logger = logging.getLogger(__name__)
 
 
 class MetricsDBReadMixin:
-    def get_session(self, session_id: int) -> CrawlSession | None:
+    def get_session(self: MetricsRowMapper, session_id: int) -> CrawlSession | None:
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT * FROM crawl_sessions WHERE id = ?", (session_id,))
             row = cursor.fetchone()
             return self._row_to_session(row) if row else None
 
-    def get_current_session(self) -> CrawlSession | None:
+    def get_current_session(self: MetricsRowMapper) -> CrawlSession | None:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
@@ -42,7 +43,7 @@ class MetricsDBReadMixin:
             row = cursor.fetchone()
             return self._row_to_session(row) if row else None
 
-    def get_recent_sessions(self, days: int = 30, limit: int = 100) -> list[CrawlSession]:
+    def get_recent_sessions(self: MetricsRowMapper, days: int = 30, limit: int = 100) -> list[CrawlSession]:
         since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -56,7 +57,7 @@ class MetricsDBReadMixin:
             )
             return [self._row_to_session(row) for row in cursor.fetchall()]
 
-    def get_store_stats_for_session(self, session_id: int) -> list[StoreCrawlStats]:
+    def get_store_stats_for_session(self: MetricsRowMapper, session_id: int) -> list[StoreCrawlStats]:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
@@ -77,7 +78,7 @@ class MetricsDBReadMixin:
                 for row in cursor.fetchall()
             ]
 
-    def get_store_aggregate_stats(self, days: int = 30) -> list[StoreAggregateStats]:
+    def get_store_aggregate_stats(self: MetricsRowMapper, days: int = 30) -> list[StoreAggregateStats]:
         since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -115,7 +116,7 @@ class MetricsDBReadMixin:
                 )
             return results
 
-    def get_item_stats_for_session(self, session_id: int) -> list[ItemCrawlStats]:
+    def get_item_stats_for_session(self: MetricsRowMapper, session_id: int) -> list[ItemCrawlStats]:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
@@ -127,7 +128,7 @@ class MetricsDBReadMixin:
             )
             return [self._row_to_item_stats(row) for row in cursor.fetchall()]
 
-    def get_store_durations(self, store_name: str, days: int = 30, limit: int = 1000) -> list[float]:
+    def get_store_durations(self: MetricsRowMapper, store_name: str, days: int = 30, limit: int = 1000) -> list[float]:
         since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -146,7 +147,7 @@ class MetricsDBReadMixin:
             )
             return [row["duration_sec"] for row in cursor.fetchall()]
 
-    def get_amazon_batch_stats(self, days: int = 30) -> list[AmazonBatchStats]:
+    def get_amazon_batch_stats(self: MetricsRowMapper, days: int = 30) -> list[AmazonBatchStats]:
         since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -159,7 +160,7 @@ class MetricsDBReadMixin:
             )
             return [self._row_to_amazon_batch(row) for row in cursor.fetchall()]
 
-    def get_heatmap_data(self, days: int = 90) -> list[HeatmapEntry]:
+    def get_heatmap_data(self: MetricsRowMapper, days: int = 90) -> list[HeatmapEntry]:
         since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -192,7 +193,7 @@ class MetricsDBReadMixin:
                 for row in cursor.fetchall()
             ]
 
-    def get_failure_timeseries(self, days: int = 30) -> list[dict]:
+    def get_failure_timeseries(self: MetricsRowMapper, days: int = 30) -> list[dict]:
         since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -211,7 +212,7 @@ class MetricsDBReadMixin:
             )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_unique_product_count_for_session(self, session_id: int) -> int:
+    def get_unique_product_count_for_session(self: MetricsRowMapper, session_id: int) -> int:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
@@ -224,7 +225,7 @@ class MetricsDBReadMixin:
             row = cursor.fetchone()
             return row["unique_product_count"] if row else 0
 
-    def get_total_item_count_for_session(self, session_id: int) -> int:
+    def get_total_item_count_for_session(self: MetricsRowMapper, session_id: int) -> int:
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT COUNT(*) as cnt FROM item_crawl_stats WHERE session_id = ?", (session_id,))
             item_count = cursor.fetchone()["cnt"]
@@ -235,7 +236,7 @@ class MetricsDBReadMixin:
             amazon_count = cursor.fetchone()["cnt"]
             return item_count + amazon_count
 
-    def calculate_cycle_stats(self, session: CrawlSession, total_product_count: int) -> CycleStats:
+    def calculate_cycle_stats(self: MetricsRowMapper, session: CrawlSession, total_product_count: int) -> CycleStats:
         unique_product_count = self.get_unique_product_count_for_session(session.id)
         total_item_count = self.get_total_item_count_for_session(session.id)
         completed_cycles = session.round_count

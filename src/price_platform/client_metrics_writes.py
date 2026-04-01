@@ -7,13 +7,14 @@ import statistics
 from datetime import timedelta
 
 from ._client_metrics_sqlite_models import ClientPerfRaw, DeviceType, MetricName, _date_lt, _date_range
+from ._sqlite_protocols import ClientMetricsAggregateProvider, SQLiteConnectionProvider
 from .platform import clock
 
 logger = logging.getLogger(__name__)
 
 
 class ClientMetricsWriteMixin:
-    def save_raw(self, data: ClientPerfRaw) -> None:
+    def save_raw(self: SQLiteConnectionProvider, data: ClientPerfRaw) -> None:
         now = clock.now()
         now_naive = now.replace(tzinfo=None)
         with self._get_connection() as conn:
@@ -37,7 +38,7 @@ class ClientMetricsWriteMixin:
             )
             conn.commit()
 
-    def aggregate_daily(self, date: str) -> int:
+    def aggregate_daily(self: SQLiteConnectionProvider, date: str) -> int:
         metrics: list[MetricName] = ["ttfb_ms", "dom_interactive_ms", "dom_complete_ms", "load_event_ms"]
         device_types: list[DeviceType] = ["mobile", "desktop"]
         aggregated_count = 0
@@ -105,7 +106,7 @@ class ClientMetricsWriteMixin:
 
         return aggregated_count
 
-    def cleanup_old_raw_data(self, retention_days: int) -> int:
+    def cleanup_old_raw_data(self: SQLiteConnectionProvider, retention_days: int) -> int:
         cutoff = clock.now() - timedelta(days=retention_days)
         cutoff_str = cutoff.date().isoformat()
         with self._get_connection() as conn:
@@ -120,7 +121,7 @@ class ClientMetricsWriteMixin:
             conn.commit()
             return deleted
 
-    def check_and_aggregate(self) -> bool:
+    def check_and_aggregate(self: ClientMetricsAggregateProvider) -> bool:
         today = clock.now().date().isoformat()
         if self._last_aggregated_date == today:
             return False

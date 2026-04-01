@@ -8,7 +8,7 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Generic, Literal, TypeVar
+from typing import Generic, Literal, Protocol, TypeVar
 
 from price_platform.migrations import CANONICAL_SELECTION_COLUMN, build_price_event_migrations
 from price_platform.platform import clock
@@ -18,6 +18,49 @@ from price_platform.sqlite_store import SQLiteStoreBase
 LockingMode = Literal["NORMAL", "EXCLUSIVE"]
 
 EventT = TypeVar("EventT")
+
+
+class StoreValueProtocol(Protocol):
+    @property
+    def value(self) -> str: ...
+
+
+class EventTypeValueProtocol(Protocol):
+    @property
+    def value(self) -> str: ...
+
+
+class PriceEventProtocol(Protocol):
+    @property
+    def event_type(self) -> EventTypeValueProtocol: ...
+    @property
+    def priority(self) -> int: ...
+    @property
+    def product_id(self) -> str: ...
+    @property
+    def store(self) -> StoreValueProtocol | str: ...
+    @property
+    def price(self) -> int: ...
+    @property
+    def url(self) -> str | None: ...
+    @property
+    def previous_price(self) -> int | None: ...
+    @property
+    def reference_price(self) -> int | None: ...
+    @property
+    def change_percent(self) -> float | None: ...
+    @property
+    def period_days(self) -> int | None: ...
+    @property
+    def recorded_at(self) -> datetime: ...
+    @property
+    def suppressed(self) -> bool: ...
+    @property
+    def superseded_by(self) -> int | None: ...
+    @property
+    def twitter_posted(self) -> bool: ...
+    @property
+    def twitter_enabled(self) -> bool: ...
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +95,12 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         with self.connection() as conn:
             yield conn
 
-    def save_event(self, event: object) -> int:
+    def save_event(self, event: PriceEventProtocol) -> int:
         selection_sql = f"{CANONICAL_SELECTION_COLUMN}, " if self._selection_column else ""
         selection_placeholder = "?, " if self._selection_column else ""
         selection_value = getattr(event, self._selection_column) if self._selection_column else None
+        store_ref = event.store
+        store_value = store_ref if isinstance(store_ref, str) else store_ref.value
 
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -70,7 +115,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
                     event.event_type.value,
                     event.priority,
                     event.product_id,
-                    event.store.value,
+                    store_value,
                     event.price,
                     event.url,
                     event.previous_price,
@@ -268,7 +313,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
     def has_recent_similar_price_event(
         self,
         product_id: str,
-        store: object,
+        store: StoreValueProtocol | str,
         price: int,
         days: int = 14,
         tolerance: int = 100,
