@@ -34,7 +34,6 @@ class BaseWebPushStore(SQLiteStoreBase):
     def __init__(
         self,
         db_path: pathlib.Path,
-        schema_dir: pathlib.Path | None,
         *,
         group_filter_column: str,
         legacy_group_filter_columns: Iterable[str] = (),
@@ -48,7 +47,7 @@ class BaseWebPushStore(SQLiteStoreBase):
         self._subscription_factory = subscription_factory or WebPushSubscriptionRecord
         super().__init__(
             db_path=db_path,
-            schema_path=resolve_schema_path("sqlite_webpush.schema", schema_dir=schema_dir),
+            schema_path=resolve_schema_path("sqlite_webpush.schema"),
             locking_mode=locking_mode,
             migrations=build_webpush_migrations(
                 group_filter_column=group_filter_column,

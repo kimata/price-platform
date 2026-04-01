@@ -59,7 +59,6 @@ def build_bootstrapper(
     *,
     target: str,
     db_path: Path,
-    schema_dir: Path | None = None,
     selection_column: str | None = None,
     group_filter_column: str = CANONICAL_GROUP_FILTER_COLUMN,
     legacy_group_filter_columns: Sequence[str] = (),
@@ -74,7 +73,7 @@ def build_bootstrapper(
     )
     return SQLiteBootstrapper(
         db_path=db_path,
-        schema_path=resolve_schema_path(spec.schema_name, schema_dir=schema_dir),
+        schema_path=resolve_schema_path(spec.schema_name),
         locking_mode="NORMAL",
         migrations=spec.build_migrations(args),
     )
@@ -117,7 +116,6 @@ def build_parser() -> argparse.ArgumentParser:
         subparser = subparsers.add_parser(command)
         subparser.add_argument("target", choices=sorted(TARGET_SPECS))
         subparser.add_argument("db_path", type=Path)
-        subparser.add_argument("--schema-dir", type=Path, default=None)
         subparser.add_argument("--selection-column", default=None)
         subparser.add_argument("--group-filter-column", default=CANONICAL_GROUP_FILTER_COLUMN)
         subparser.add_argument("--legacy-group-filter-column", action="append", default=[])
@@ -147,7 +145,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     bootstrapper = build_bootstrapper(
         target=args.target,
         db_path=args.db_path,
-        schema_dir=args.schema_dir,
         selection_column=args.selection_column,
         group_filter_column=args.group_filter_column,
         legacy_group_filter_columns=args.legacy_group_filter_column,

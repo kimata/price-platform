@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import warnings
 
 _BUNDLED_SCHEMA_DIR = Path(__file__).with_name("schema")
 
@@ -12,18 +11,8 @@ def bundled_schema_dir() -> Path:
     return _BUNDLED_SCHEMA_DIR
 
 
-def resolve_schema_path(schema_name: str, *, schema_dir: Path | None = None) -> Path:
+def resolve_schema_path(schema_name: str) -> Path:
     """Resolve the schema file path for a SQLite store."""
-
-    if schema_dir is not None:
-        warnings.warn(
-            "schema_dir overrides are deprecated; bundled price-platform schemas are the default owner.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        override_path = schema_dir / schema_name
-        if override_path.exists():
-            return override_path
 
     bundled_path = _BUNDLED_SCHEMA_DIR / schema_name
     if bundled_path.exists():

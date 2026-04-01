@@ -14,9 +14,6 @@ LockingMode = Literal["NORMAL", "EXCLUSIVE"]
 class SupportsNotificationStoreConfig(Protocol):
     notification: Any
 
-    @property
-    def schema_dir(self) -> pathlib.Path: ...
-
     def get_absolute_path(self, relative_path: pathlib.Path) -> pathlib.Path: ...
 
 

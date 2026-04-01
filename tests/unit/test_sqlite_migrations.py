@@ -3,8 +3,6 @@ from __future__ import annotations
 import pathlib
 import sqlite3
 
-import pytest
-
 from price_platform.notification.webpush_store import BaseWebPushStore
 from price_platform.schema_registry import bundled_schema_dir, resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
@@ -44,13 +42,11 @@ def test_price_event_store_canonicalizes_selection_column_once(tmp_path: pathlib
 
     BasePriceEventStore(
         db_path=db_path,
-        schema_dir=None,
         selection_column="color_key",
         event_factory=lambda row, selection: {"row": row, "selection": selection},
     )
     BasePriceEventStore(
         db_path=db_path,
-        schema_dir=None,
         selection_column="color_key",
         event_factory=lambda row, selection: {"row": row, "selection": selection},
     )
@@ -99,7 +95,6 @@ def test_webpush_store_renames_legacy_columns(tmp_path: pathlib.Path) -> None:
 
     BaseWebPushStore(
         db_path=db_path,
-        schema_dir=None,
         group_filter_column="maker_filter",
         legacy_group_filter_columns=(),
         legacy_product_filter_columns=("item_filter",),
@@ -119,14 +114,7 @@ def test_webpush_store_renames_legacy_columns(tmp_path: pathlib.Path) -> None:
     assert metadata["schema_sha256"]
 
 
-def test_schema_registry_prefers_override_but_has_bundled_defaults(tmp_path: pathlib.Path) -> None:
-    schema_dir = tmp_path / "schema"
-    schema_dir.mkdir()
-    override_path = schema_dir / "sqlite_notification.schema"
-    _write_schema(override_path, "CREATE TABLE IF NOT EXISTS override_marker (id INTEGER);")
-
-    with pytest.deprecated_call(match="schema_dir overrides are deprecated"):
-        assert resolve_schema_path("sqlite_notification.schema", schema_dir=schema_dir) == override_path
+def test_schema_registry_resolves_bundled_schema() -> None:
     assert resolve_schema_path("sqlite_notification.schema") == bundled_schema_dir() / "sqlite_notification.schema"
 
 

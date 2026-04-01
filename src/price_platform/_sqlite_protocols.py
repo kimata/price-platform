@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from contextlib import AbstractContextManager
 from typing import Protocol
 import sqlite3
 
@@ -13,7 +13,7 @@ from ._metrics_sqlite_models import AmazonBatchStats, CrawlSession, ItemCrawlSta
 class SQLiteConnectionProvider(Protocol):
     """Provide SQLite connections to mixins."""
 
-    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]: ...
+    def _get_connection(self) -> AbstractContextManager[sqlite3.Connection]: ...
 
 
 class ClientMetricsAggregateProvider(SQLiteConnectionProvider, Protocol):
@@ -56,4 +56,3 @@ class MetricsRowMapper(SQLiteConnectionProvider, Protocol):
     def _row_to_item_stats(self, row: sqlite3.Row) -> ItemCrawlStats: ...
 
     def _row_to_amazon_batch(self, row: sqlite3.Row) -> AmazonBatchStats: ...
-

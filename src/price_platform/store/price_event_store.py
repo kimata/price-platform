@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from collections.abc import Callable, Generator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Generic, Literal, Protocol, TypeVar
@@ -72,7 +72,6 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         self,
         *,
         db_path: Path,
-        schema_dir: Path | None,
         selection_column: str | None,
         event_factory: Callable[[sqlite3.Row, str | None], EventT],
         locking_mode: LockingMode = "NORMAL",
@@ -82,7 +81,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         self._event_factory = event_factory
         super().__init__(
             db_path=db_path,
-            schema_path=resolve_schema_path("sqlite_price_events.schema", schema_dir=schema_dir),
+            schema_path=resolve_schema_path("sqlite_price_events.schema"),
             locking_mode=locking_mode,
             migrations=build_price_event_migrations(
                 selection_column=selection_column,
@@ -91,7 +90,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         )
 
     @contextmanager
-    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+    def _get_connection(self) -> AbstractContextManager[sqlite3.Connection]:
         with self.connection() as conn:
             yield conn
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import hashlib
 from collections.abc import Callable, Generator, Sequence
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import sqlite3
@@ -181,7 +181,7 @@ class SQLiteStoreBase:
         self._bootstrapper.ensure_ready()
 
     @contextmanager
-    def connection(self) -> Generator[sqlite3.Connection, None, None]:
+    def connection(self) -> AbstractContextManager[sqlite3.Connection]:
         with platform_sqlite.connect(self._db_path, locking_mode=self._locking_mode) as conn:
             conn.row_factory = sqlite3.Row
             yield conn
