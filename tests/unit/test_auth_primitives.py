@@ -29,6 +29,35 @@ def test_file_secret_store_load_missing_raises(tmp_path: Path) -> None:
         raise AssertionError("FileSecretStore.load() should raise for missing files")
 
 
+def test_file_secret_store_shared_lock_across_instances(tmp_path: Path) -> None:
+    """同じパスを指す複数インスタンスが同一ロックを共有することを確認"""
+    secret_path = tmp_path / "shared.key"
+    store_a = price_platform.auth.secrets.FileSecretStore(secret_path)
+    store_b = price_platform.auth.secrets.FileSecretStore(secret_path)
+
+    lock_a = price_platform.auth.secrets.FileSecretStore._lock_for(store_a._path)
+    lock_b = price_platform.auth.secrets.FileSecretStore._lock_for(store_b._path)
+    assert lock_a is lock_b
+
+
+def test_file_secret_store_concurrent_ensure(tmp_path: Path) -> None:
+    """複数スレッドから同時に ensure() しても同一シークレットが返ることを確認"""
+    import concurrent.futures
+
+    secret_path = tmp_path / "race.key"
+    num_threads = 20
+
+    def call_ensure() -> str:
+        store = price_platform.auth.secrets.FileSecretStore(secret_path)
+        return store.ensure()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as pool:
+        futures = [pool.submit(call_ensure) for _ in range(num_threads)]
+        results = [f.result() for f in futures]
+
+    assert len(set(results)) == 1, f"Expected single secret, got {len(set(results))} distinct values"
+
+
 def test_in_memory_rate_limiter_lockout_and_clear() -> None:
     current_time = 1_000.0
 

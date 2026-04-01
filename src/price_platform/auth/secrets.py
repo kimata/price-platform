@@ -20,40 +20,87 @@ class SecretStore(Protocol):
 
 
 class FileSecretStore:
-    """Thread-safe file-backed secret store."""
+    """Thread-safe file-backed secret store.
+
+    Synchronisation is per resolved path: all instances that point to the
+    same file share one ``threading.Lock``, so concurrent ``ensure()``
+    calls in a threaded Flask server never race on secret creation.
+
+    Creation uses ``O_CREAT | O_EXCL`` so that only the first writer
+    wins even across processes.
+    """
+
+    _class_lock = threading.Lock()
+    _path_locks: dict[pathlib.Path, threading.Lock] = {}
+    _cache: dict[pathlib.Path, str] = {}
 
     def __init__(self, path: pathlib.Path):
-        self._path = path
-        self._lock = threading.Lock()
-        self._cached_secret: str | None = None
+        self._path = path.resolve()
+
+    @classmethod
+    def _lock_for(cls, path: pathlib.Path) -> threading.Lock:
+        """Return a shared lock for *path*, creating one if needed."""
+        with cls._class_lock:
+            if path not in cls._path_locks:
+                cls._path_locks[path] = threading.Lock()
+            return cls._path_locks[path]
 
     def load(self) -> str:
         """Load an existing secret value from disk."""
-        if self._cached_secret is not None:
-            return self._cached_secret
+        cached = self._cache.get(self._path)
+        if cached is not None:
+            return cached
 
-        with self._lock:
-            if self._cached_secret is not None:
-                return self._cached_secret
+        lock = self._lock_for(self._path)
+        with lock:
+            cached = self._cache.get(self._path)
+            if cached is not None:
+                return cached
             if not self._path.exists():
                 msg = f"Secret file not found: {self._path}"
                 raise FileNotFoundError(msg)
-            self._cached_secret = self._path.read_text(encoding="utf-8").strip()
-            return self._cached_secret
+            secret = self._path.read_text(encoding="utf-8").strip()
+            self._cache[self._path] = secret
+            return secret
 
-    def create(self) -> str:
-        """Create a new secret file and return the generated value."""
-        with self._lock:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            secret_value = secrets.token_urlsafe(64)
-            self._path.write_text(secret_value, encoding="utf-8")
-            os.chmod(self._path, 0o600)
-            self._cached_secret = secret_value
-            return secret_value
+    def _atomic_create(self) -> str:
+        """Create a new secret file atomically.
+
+        Uses ``O_CREAT | O_EXCL`` so that only one writer succeeds when
+        multiple processes race.  If the file already exists (another
+        process won), fall back to reading.
+        """
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        secret_value = secrets.token_urlsafe(64)
+        try:
+            fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            secret = self._path.read_text(encoding="utf-8").strip()
+            self._cache[self._path] = secret
+            return secret
+        try:
+            os.write(fd, secret_value.encode("utf-8"))
+        finally:
+            os.close(fd)
+        self._cache[self._path] = secret_value
+        return secret_value
 
     def ensure(self) -> str:
-        """Load a secret value or create it when it does not exist."""
-        try:
-            return self.load()
-        except FileNotFoundError:
-            return self.create()
+        """Load a secret value or create it when it does not exist.
+
+        Single critical section: check cache → check file → atomic create.
+        """
+        cached = self._cache.get(self._path)
+        if cached is not None:
+            return cached
+
+        lock = self._lock_for(self._path)
+        with lock:
+            cached = self._cache.get(self._path)
+            if cached is not None:
+                return cached
+            if self._path.exists():
+                secret = self._path.read_text(encoding="utf-8").strip()
+                self._cache[self._path] = secret
+                return secret
+            return self._atomic_create()
