@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
@@ -22,18 +23,29 @@ ConfigT = TypeVar("ConfigT")
 
 @dataclass
 class BaseWebDriverPool(Generic[MakerT, ConfigT]):
-    """WebDriver pool keyed by maker-like objects with a ``value`` field."""
+    """WebDriver pool keyed by maker-like objects with a ``value`` field.
+
+    When *max_size* is set, the pool evicts the least-recently-used driver
+    once the limit is reached.
+    """
 
     MAX_CONSECUTIVE_TIMEOUTS: ClassVar[int] = 10
 
     config: ConfigT
     profile_name_getter: Callable[[MakerT], str]
     page_load_timeout: int | None = None
-    _managers: dict[MakerT, browser.BrowserManager] = field(default_factory=dict, init=False)
+    max_size: int | None = None
+    _managers: OrderedDict[MakerT, browser.BrowserManager] = field(
+        default_factory=OrderedDict, init=False
+    )
     _consecutive_timeout_counts: dict[MakerT, int] = field(default_factory=dict, init=False)
 
     def _get_or_create_manager(self, maker: MakerT) -> browser.BrowserManager:
-        if maker not in self._managers:
+        if maker in self._managers:
+            self._managers.move_to_end(maker)
+        else:
+            if self.max_size is not None and len(self._managers) >= self.max_size:
+                self._evict_lru()
             data_path = pathlib.Path(self.config.selenium.data_path)
             profile_name = self.profile_name_getter(maker)
             self._managers[maker] = browser.create_browser_manager(
@@ -44,6 +56,14 @@ class BaseWebDriverPool(Generic[MakerT, ConfigT]):
             )
             logger.info("WebDriver を作成: %s", profile_name)
         return self._managers[maker]
+
+    def _evict_lru(self) -> None:
+        """最も長く使われていないドライバを解放する。"""
+        oldest_maker, oldest_manager = self._managers.popitem(last=False)
+        profile_name = self.profile_name_getter(oldest_maker)
+        logger.info("WebDriver を LRU で解放: %s", profile_name)
+        oldest_manager.quit()
+        self._consecutive_timeout_counts.pop(oldest_maker, None)
 
     def get(self, maker: MakerT) -> tuple[WebDriver, WebDriverWait]:
         manager = self._get_or_create_manager(maker)
