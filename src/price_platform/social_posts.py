@@ -12,6 +12,10 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 _SENTENCE_SPLIT_RE = re.compile(r"[。！？\n]+")
 _WHITESPACE_RE = re.compile(r"\s+")
+_URL_RE = re.compile(r"https?://\S+")
+
+# Twitter/X replaces every URL with a t.co short link of this fixed length.
+_TCO_URL_LENGTH = 23
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,17 @@ class ComposedSocialPost:
     tracked_url: str
     post_variant: str
     post_id: str
+
+
+def _tweet_length(text: str) -> int:
+    """Estimate the length of *text* as Twitter/X would count it.
+
+    Every ``https?://`` URL is replaced by a t.co short link whose
+    display length is fixed at :data:`_TCO_URL_LENGTH` characters,
+    regardless of the original URL length.
+    """
+    shortened = _URL_RE.sub("x" * _TCO_URL_LENGTH, text)
+    return len(shortened)
 
 
 def _stable_index(seed: str, size: int) -> int:
@@ -227,7 +242,7 @@ def compose_social_post(ctx: SocialPostContext) -> ComposedSocialPost:
         lines.append(ctx.hashtag)
     lines.append(tracked_url)
 
-    while len("\n".join(lines)) > 280 and len(lines) > 4:
+    while _tweet_length("\n".join(lines)) > 280 and len(lines) > 4:
         if ctx.hashtag in lines:
             lines.remove(ctx.hashtag)
             continue
