@@ -91,6 +91,15 @@ class MetricsDBProtocol(Protocol):
     def cleanup_old_records(self, days: int = 365) -> int: ...
 
 
+@runtime_checkable
+class SessionMemoryTrackerProtocol(Protocol):
+    """Protocol for optional session-scoped memory tracking."""
+
+    def start(self, started_at: datetime | None = None) -> None: ...
+
+    def stop(self) -> None: ...
+
+
 @dataclass
 class StoreMetricsAccumulator:
     """Accumulator for store-level metrics during a session."""
@@ -156,10 +165,12 @@ class MetricsManager:
         db: MetricsDBProtocol,
         *,
         now_fn: Callable[[], datetime] | None = None,
+        memory_tracker: SessionMemoryTrackerProtocol | None = None,
     ):
         """Initialize metrics manager."""
         self._db = db
         self._now_fn = now_fn or _default_now_fn
+        self._memory_tracker = memory_tracker
         self._current_session_id: int | None = None
         self._store_accumulators: dict[str, StoreMetricsAccumulator] = {}
         self._total_items = 0
@@ -188,6 +199,7 @@ class MetricsManager:
             logger.warning(f"Session {self._current_session_id} already active, ending it first")
             self.end_session("replaced")
 
+        started_at = self._now_fn()
         self._current_session_id = self._db.start_session()
         self._store_accumulators = {}
         self._total_items = 0
@@ -195,6 +207,8 @@ class MetricsManager:
         self._failed_items = 0
         self._processed_product_ids = set()
         self._success_product_ids = set()
+        if self._memory_tracker is not None:
+            self._memory_tracker.start(started_at=started_at)
         logger.info(f"Started metrics session {self._current_session_id}")
         return self._current_session_id
 
@@ -216,6 +230,8 @@ class MetricsManager:
         )
 
         self._db.end_session(self._current_session_id, exit_reason)
+        if self._memory_tracker is not None:
+            self._memory_tracker.stop()
         logger.info(f"Ended metrics session {self._current_session_id}: {exit_reason}")
         self._current_session_id = None
 

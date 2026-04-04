@@ -97,7 +97,20 @@ def create_configured_platform_app(
     register_optional_blueprints(app, spec.optional_blueprints, logger=logger)
     for installer in spec.route_installers:
         installer(app)
-    finalize_platform_app(app, logger=logger, warmup=spec.warmup)
+    warmup = spec.warmup
+    if spec.warmup_steps:
+        composed = create_warmup(*spec.warmup_steps)
+        if warmup is None:
+            warmup = composed
+        else:
+            explicit_warmup = warmup
+
+            def combined_warmup() -> None:
+                composed()
+                explicit_warmup()
+
+            warmup = combined_warmup
+    finalize_platform_app(app, logger=logger, warmup=warmup)
     return app
 
 

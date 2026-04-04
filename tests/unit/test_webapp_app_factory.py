@@ -135,6 +135,35 @@ def test_create_warmup_runs_all_steps() -> None:
     assert steps == ["catalog", "store", "guide"]
 
 
+def test_create_configured_platform_app_runs_warmup_steps_without_explicit_callback() -> None:
+    steps: list[str] = []
+
+    spec = price_platform.webapp.PlatformAppSpec(
+        settings=price_platform.webapp.WebAppSettings(
+            app_name="test-app",
+            url_prefix="/test",
+            external_url="https://example.com",
+        ),
+        common_routes=price_platform.webapp.CommonRoutesSettings(
+            url_prefix="/test",
+            img_dir=Path("/tmp/img"),
+            flea_thumb_dir=Path("/tmp/thumb"),
+        ),
+        healthcheck=lambda: None,
+        warmup_steps=(
+            lambda: steps.append("catalog"),
+            lambda: steps.append("store"),
+        ),
+    )
+
+    price_platform.webapp.create_configured_platform_app(
+        spec,
+        connection_getter=lambda: _ConnectionStub(),
+    )
+
+    assert steps == ["catalog", "store"]
+
+
 def test_notify_content_update_emits_event(monkeypatch) -> None:
     captured: list[object] = []
 

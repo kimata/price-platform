@@ -31,6 +31,7 @@ from .dependencies import (
 from .cors import extract_origin, get_cors_origins, is_allowed_request_origin
 from .headers import CacheRule, apply_common_headers
 from .request_context import install_request_hooks
+from .runtime_memory_routes import install_runtime_memory_routes
 
 __all__ = [
     "BlueprintRegistration",
@@ -60,6 +61,7 @@ __all__ = [
     "notify_content_update",
     "get_cors_origins",
     "install_request_hooks",
+    "install_runtime_memory_routes",
     "is_allowed_request_origin",
     "register_blueprints",
     "register_optional_blueprints",

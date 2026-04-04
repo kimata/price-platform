@@ -53,6 +53,7 @@ class PlatformAppSpec:
     blueprints: tuple[BlueprintRegistration, ...] = field(default_factory=tuple)
     optional_blueprints: tuple[OptionalBlueprintRegistration, ...] = field(default_factory=tuple)
     route_installers: tuple[Callable[[flask.Flask], None], ...] = field(default_factory=tuple)
+    warmup_steps: tuple[Callable[[], object], ...] = field(default_factory=tuple)
     warmup: Callable[[], None] | None = None
 
 

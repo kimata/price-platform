@@ -113,6 +113,18 @@ class DummyMetricsDB:
         return 0
 
 
+@dataclass
+class DummyMemoryTracker:
+    started_at: list[datetime | None] = field(default_factory=list)
+    stop_calls: int = 0
+
+    def start(self, started_at: datetime | None = None) -> None:
+        self.started_at.append(started_at)
+
+    def stop(self) -> None:
+        self.stop_calls += 1
+
+
 def test_metrics_manager_tracks_items_and_flushes_summary() -> None:
     db = DummyMetricsDB()
     manager = price_platform.managers.metrics_manager.MetricsManager(
@@ -143,3 +155,19 @@ def test_metrics_manager_complete_round_without_session_returns_zero() -> None:
     manager = price_platform.managers.metrics_manager.MetricsManager(DummyMetricsDB())
 
     assert manager.complete_round() == 0
+
+
+def test_metrics_manager_starts_and_stops_memory_tracker() -> None:
+    tracker = DummyMemoryTracker()
+    started_at = datetime(2026, 1, 2, 3, 4, 5)
+    manager = price_platform.managers.metrics_manager.MetricsManager(
+        DummyMetricsDB(),
+        now_fn=lambda: started_at,
+        memory_tracker=tracker,
+    )
+
+    manager.start_session()
+    manager.end_session("normal")
+
+    assert tracker.started_at == [started_at]
+    assert tracker.stop_calls == 1
