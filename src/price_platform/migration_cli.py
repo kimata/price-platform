@@ -7,13 +7,9 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-import sqlite3
 
 from .migrations import (
-    CANONICAL_GROUP_FILTER_COLUMN,
     build_client_metrics_migrations,
-    build_price_event_migrations,
-    build_webpush_migrations,
 )
 from .platform import sqlite as platform_sqlite
 from .schema_registry import resolve_schema_path
@@ -26,16 +22,8 @@ class MigrationTargetSpec:
     schema_name: str
 
     def build_migrations(self, args: argparse.Namespace) -> tuple[Migration, ...]:
-        if self.name == "price_events":
-            return build_price_event_migrations(selection_column=args.selection_column)
         if self.name == "client_metrics":
             return build_client_metrics_migrations()
-        if self.name == "webpush":
-            return build_webpush_migrations(
-                group_filter_column=args.group_filter_column,
-                legacy_group_filter_columns=tuple(args.legacy_group_filter_column),
-                legacy_product_filter_columns=tuple(args.legacy_product_filter_column),
-            )
         return ()
 
 
@@ -62,18 +50,9 @@ def build_bootstrapper(
     *,
     target: str,
     db_path: Path,
-    selection_column: str | None = None,
-    group_filter_column: str = CANONICAL_GROUP_FILTER_COLUMN,
-    legacy_group_filter_columns: Sequence[str] = (),
-    legacy_product_filter_columns: Sequence[str] = (),
 ) -> SQLiteBootstrapper:
     spec = TARGET_SPECS[target]
-    args = argparse.Namespace(
-        selection_column=selection_column,
-        group_filter_column=group_filter_column,
-        legacy_group_filter_column=list(legacy_group_filter_columns),
-        legacy_product_filter_column=list(legacy_product_filter_columns),
-    )
+    args = argparse.Namespace()
     return SQLiteBootstrapper(
         db_path=db_path,
         schema_path=resolve_schema_path(spec.schema_name),
@@ -119,10 +98,6 @@ def build_parser() -> argparse.ArgumentParser:
         subparser = subparsers.add_parser(command)
         subparser.add_argument("target", choices=sorted(TARGET_SPECS))
         subparser.add_argument("db_path", type=Path)
-        subparser.add_argument("--selection-column", default=None)
-        subparser.add_argument("--group-filter-column", default=CANONICAL_GROUP_FILTER_COLUMN)
-        subparser.add_argument("--legacy-group-filter-column", action="append", default=[])
-        subparser.add_argument("--legacy-product-filter-column", action="append", default=[])
 
     return parser
 
@@ -148,10 +123,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     bootstrapper = build_bootstrapper(
         target=args.target,
         db_path=args.db_path,
-        selection_column=args.selection_column,
-        group_filter_column=args.group_filter_column,
-        legacy_group_filter_columns=args.legacy_group_filter_column,
-        legacy_product_filter_columns=args.legacy_product_filter_column,
     )
 
     if args.command == "apply":

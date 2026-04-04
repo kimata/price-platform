@@ -3,18 +3,6 @@
 from __future__ import annotations
 
 
-def resolve_selection_value(
-    *,
-    selection_key: str | None = None,
-    legacy_value: str | None = None,
-    legacy_name: str,
-) -> str | None:
-    """Resolve a canonical selection value from shared and legacy inputs."""
-    if selection_key is not None and legacy_value is not None and selection_key != legacy_value:
-        raise ValueError(f"selection_key and {legacy_name} mismatch")
-    return selection_key if selection_key is not None else legacy_value
-
-
 def build_current_prices_filter(
     *,
     column_name: str,

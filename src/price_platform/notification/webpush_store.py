@@ -6,15 +6,9 @@ import json
 import logging
 import pathlib
 import sqlite3
-from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 
-from price_platform.migrations import (
-    CANONICAL_GROUP_FILTER_COLUMN,
-    CANONICAL_PRODUCT_FILTER_COLUMN,
-    build_webpush_migrations,
-)
 from price_platform.platform import clock
 from price_platform.schema_registry import resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
@@ -28,6 +22,9 @@ from ._webpush_store_types import (
 
 logger = logging.getLogger(__name__)
 
+CANONICAL_GROUP_FILTER_COLUMN = "group_filter"
+CANONICAL_PRODUCT_FILTER_COLUMN = "product_filter"
+
 class BaseWebPushStore(SQLiteStoreBase):
     """SQLite-backed Web Push subscription store with configurable group column."""
 
@@ -35,25 +32,16 @@ class BaseWebPushStore(SQLiteStoreBase):
         self,
         db_path: pathlib.Path,
         *,
-        group_filter_column: str,
-        legacy_group_filter_columns: Iterable[str] = (),
-        legacy_product_filter_columns: Iterable[str] = (),
         locking_mode: LockingMode = "NORMAL",
         subscription_factory: SubscriptionFactory | None = None,
     ):
         self._group_filter_column = CANONICAL_GROUP_FILTER_COLUMN
-        self._legacy_group_filter_columns = tuple(legacy_group_filter_columns)
-        self._legacy_product_filter_columns = tuple(legacy_product_filter_columns)
         self._subscription_factory = subscription_factory or WebPushSubscriptionRecord
         super().__init__(
             db_path=db_path,
             schema_path=resolve_schema_path("sqlite_webpush.schema"),
             locking_mode=locking_mode,
-            migrations=build_webpush_migrations(
-                group_filter_column=group_filter_column,
-                legacy_group_filter_columns=legacy_group_filter_columns,
-                legacy_product_filter_columns=legacy_product_filter_columns,
-            ),
+            migrations=(),
         )
 
     @contextmanager

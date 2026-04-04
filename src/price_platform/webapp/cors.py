@@ -47,17 +47,9 @@ def is_allowed_request_origin(
 ) -> bool:
     """Return whether a request origin or referer matches the allowed origin list.
 
-    If *allowed_origins* is empty, any request that carries an Origin or
-    Referer header is accepted (presence-only check).  This preserves
-    backward-compatible behaviour for environments where external_url is
-    not configured.
-
     Requests from localhost or private-IP origins are always accepted
     when an Origin header is present (CI / E2E environments).
     """
-    if not allowed_origins:
-        return bool(origin or referer)
-
     if origin and origin in allowed_origins:
         return True
 

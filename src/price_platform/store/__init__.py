@@ -20,7 +20,6 @@ _EXPORTS = {
     "run_scrape_with_retry": (".scrape_retry", "run_scrape_with_retry"),
     "append_selection_filter": (".selection", "append_selection_filter"),
     "build_current_prices_filter": (".selection", "build_current_prices_filter"),
-    "resolve_selection_value": (".selection", "resolve_selection_value"),
     "group_shuffle": (".shuffle", "group_shuffle"),
     "BaseWebDriverPool": (".webdriver_pool", "BaseWebDriverPool"),
 }

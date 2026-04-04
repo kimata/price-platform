@@ -10,10 +10,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Generic, Literal, Protocol, TypeVar
 
-from price_platform.migrations import CANONICAL_SELECTION_COLUMN, build_price_event_migrations
 from price_platform.platform import clock
 from price_platform.schema_registry import resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
+
+CANONICAL_SELECTION_COLUMN = "selection_key"
 
 LockingMode = Literal["NORMAL", "EXCLUSIVE"]
 
@@ -75,7 +76,6 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         selection_column: str | None,
         event_factory: Callable[[sqlite3.Row, str | None], EventT],
         locking_mode: LockingMode = "NORMAL",
-        pre_schema_migrate: Callable[[sqlite3.Connection], None] | None = None,
     ):
         self._selection_column = selection_column
         self._event_factory = event_factory
@@ -83,10 +83,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
             db_path=db_path,
             schema_path=resolve_schema_path("sqlite_price_events.schema"),
             locking_mode=locking_mode,
-            migrations=build_price_event_migrations(
-                selection_column=selection_column,
-                pre_schema_migrate=pre_schema_migrate,
-            ),
+            migrations=(),
         )
 
     @contextmanager

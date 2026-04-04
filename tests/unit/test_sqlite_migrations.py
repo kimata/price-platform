@@ -13,7 +13,7 @@ def _write_schema(path: pathlib.Path, sql: str) -> None:
     path.write_text(sql, encoding="utf-8")
 
 
-def test_price_event_store_canonicalizes_selection_column_once(tmp_path: pathlib.Path) -> None:
+def test_price_event_store_uses_canonical_schema_without_compat_migrations(tmp_path: pathlib.Path) -> None:
     db_path = tmp_path / "events.db"
     with sqlite3.connect(db_path) as conn:
         conn.executescript(
@@ -30,7 +30,7 @@ def test_price_event_store_canonicalizes_selection_column_once(tmp_path: pathlib
                 reference_price INTEGER,
                 change_percent REAL,
                 period_days INTEGER,
-                color_key TEXT,
+                selection_key TEXT,
                 recorded_at TEXT,
                 suppressed INTEGER DEFAULT 0,
                 superseded_by INTEGER,
@@ -42,12 +42,12 @@ def test_price_event_store_canonicalizes_selection_column_once(tmp_path: pathlib
 
     BasePriceEventStore(
         db_path=db_path,
-        selection_column="color_key",
+        selection_column="variant_id",
         event_factory=lambda row, selection: {"row": row, "selection": selection},
     )
     BasePriceEventStore(
         db_path=db_path,
-        selection_column="color_key",
+        selection_column="variant_id",
         event_factory=lambda row, selection: {"row": row, "selection": selection},
     )
 
@@ -57,13 +57,12 @@ def test_price_event_store_canonicalizes_selection_column_once(tmp_path: pathlib
         metadata = dict(conn.execute("SELECT key, value FROM schema_metadata").fetchall())
 
     assert "selection_key" in columns
-    assert "color_key" not in columns
-    assert "canonicalize-price-events-selection" in migrations
+    assert "canonicalize-price-events-selection" not in migrations
     assert metadata["schema_name"] == "sqlite_price_events.schema"
     assert metadata["schema_sha256"]
 
 
-def test_webpush_store_renames_legacy_columns(tmp_path: pathlib.Path) -> None:
+def test_webpush_store_uses_canonical_schema_without_compat_migrations(tmp_path: pathlib.Path) -> None:
     db_path = tmp_path / "webpush.db"
     with sqlite3.connect(db_path) as conn:
         conn.executescript(
@@ -73,8 +72,8 @@ def test_webpush_store_renames_legacy_columns(tmp_path: pathlib.Path) -> None:
                 endpoint TEXT UNIQUE,
                 p256dh_key TEXT,
                 auth_key TEXT,
-                maker_filter TEXT,
-                item_filter TEXT,
+                group_filter TEXT,
+                product_filter TEXT,
                 event_type_filter TEXT,
                 created_at TEXT,
                 last_used_at TEXT,
@@ -93,12 +92,7 @@ def test_webpush_store_renames_legacy_columns(tmp_path: pathlib.Path) -> None:
             """
         )
 
-    BaseWebPushStore(
-        db_path=db_path,
-        group_filter_column="maker_filter",
-        legacy_group_filter_columns=(),
-        legacy_product_filter_columns=("item_filter",),
-    )
+    BaseWebPushStore(db_path=db_path)
 
     with sqlite3.connect(db_path) as conn:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(webpush_subscriptions)").fetchall()}
@@ -107,9 +101,7 @@ def test_webpush_store_renames_legacy_columns(tmp_path: pathlib.Path) -> None:
 
     assert "group_filter" in columns
     assert "product_filter" in columns
-    assert "maker_filter" not in columns
-    assert "item_filter" not in columns
-    assert "canonicalize-webpush-filters" in migrations
+    assert "canonicalize-webpush-filters" not in migrations
     assert metadata["schema_name"] == "sqlite_webpush.schema"
     assert metadata["schema_sha256"]
 
