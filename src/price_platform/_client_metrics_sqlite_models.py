@@ -15,6 +15,7 @@ DeviceType = Literal["mobile", "desktop"]
 MetricName = Literal["ttfb_ms", "dom_interactive_ms", "dom_complete_ms", "load_event_ms"]
 WebVitalName = Literal["LCP", "CLS", "INP", "FCP", "TTFB"]
 WebVitalRating = Literal["good", "needs-improvement", "poor"]
+SocialReferralEventName = Literal["landing", "engaged_30s", "second_page"]
 
 _WEB_VITAL_MAX_VALUES: dict[str, float] = {
     "LCP": 60_000,
@@ -29,6 +30,7 @@ _MOBILE_PATTERN = re.compile(
     r"(android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)",
     re.IGNORECASE,
 )
+_WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _date_range(date_str: str) -> tuple[str, str]:
@@ -213,3 +215,69 @@ def detect_device_type(user_agent: str | None) -> DeviceType:
     if _MOBILE_PATTERN.search(user_agent):
         return "mobile"
     return "desktop"
+
+
+def _clean_text(value: object, *, max_len: int = 256) -> str | None:
+    if not isinstance(value, str):
+        return None
+    compact = _WHITESPACE_RE.sub(" ", value).strip()
+    if not compact:
+        return None
+    return compact[:max_len]
+
+
+@dataclass(frozen=True)
+class SocialReferralEventRaw:
+    event_name: SocialReferralEventName
+    source: str
+    medium: str | None
+    campaign: str | None
+    post_variant: str | None
+    post_id: str | None
+    social_event: str | None
+    session_id: str
+    landing_path: str
+    page_path: str
+    referrer: str | None
+    page_depth: int
+    device_type: DeviceType
+    user_agent: str | None
+
+    @classmethod
+    def parse(cls, data: dict, device_type: DeviceType, user_agent: str | None) -> SocialReferralEventRaw | None:
+        event_name = data.get("event_name")
+        if event_name not in ("landing", "engaged_30s", "second_page"):
+            return None
+
+        source = _clean_text(data.get("source"), max_len=32)
+        session_id = _clean_text(data.get("session_id"), max_len=64)
+        landing_path = _clean_text(data.get("landing_path"), max_len=255)
+        page_path = _clean_text(data.get("page_path"), max_len=255)
+        if source is None or session_id is None or landing_path is None or page_path is None:
+            return None
+        if not landing_path.startswith("/") or not page_path.startswith("/"):
+            return None
+
+        try:
+            page_depth = int(data.get("page_depth", 1))
+        except (TypeError, ValueError):
+            return None
+        if page_depth < 1 or page_depth > 100:
+            return None
+
+        return cls(
+            event_name=event_name,
+            source=source,
+            medium=_clean_text(data.get("medium"), max_len=32),
+            campaign=_clean_text(data.get("campaign"), max_len=64),
+            post_variant=_clean_text(data.get("post_variant"), max_len=32),
+            post_id=_clean_text(data.get("post_id"), max_len=64),
+            social_event=_clean_text(data.get("social_event"), max_len=32),
+            session_id=session_id,
+            landing_path=landing_path,
+            page_path=page_path,
+            referrer=_clean_text(data.get("referrer"), max_len=255),
+            page_depth=page_depth,
+            device_type=device_type,
+            user_agent=user_agent,
+        )

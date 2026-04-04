@@ -15,6 +15,7 @@ from ._client_metrics_sqlite_models import (
     ClientPerfRaw,
     DeviceType,
     MetricName,
+    SocialReferralEventRaw,
     WebVitalBoxplotData,
     WebVitalDaily,
     WebVitalName,
@@ -22,9 +23,11 @@ from ._client_metrics_sqlite_models import (
     detect_device_type,
 )
 from .client_metrics_boxplot import ClientMetricsBoxplotMixin
+from .client_metrics_social_referrals import ClientMetricsSocialReferralMixin
 from .client_metrics_svg import generate_boxplot_svg
 from .client_metrics_web_vitals import ClientMetricsWebVitalsReadMixin, ClientMetricsWebVitalsWriteMixin
 from .client_metrics_writes import ClientMetricsWriteMixin
+from .migrations import build_client_metrics_migrations
 from .schema_registry import resolve_schema_path
 from .sqlite_store import SQLiteStoreBase
 
@@ -37,6 +40,7 @@ if TYPE_CHECKING:
 class ClientMetricsDB(
     ClientMetricsWriteMixin,
     ClientMetricsBoxplotMixin,
+    ClientMetricsSocialReferralMixin,
     ClientMetricsWebVitalsWriteMixin,
     ClientMetricsWebVitalsReadMixin,
     SQLiteStoreBase,
@@ -53,6 +57,7 @@ class ClientMetricsDB(
         super().__init__(
             db_path=db_path,
             schema_path=schema_path or resolve_schema_path("sqlite_client_metrics.schema"),
+            migrations=build_client_metrics_migrations(),
         )
 
     @contextmanager
@@ -68,6 +73,7 @@ __all__ = [
     "ClientPerfRaw",
     "DeviceType",
     "MetricName",
+    "SocialReferralEventRaw",
     "WebVitalBoxplotData",
     "WebVitalDaily",
     "WebVitalName",
