@@ -50,6 +50,34 @@ class MetricsDB(MetricsDBWriteMixin, MetricsDBReadMixin, SQLiteStoreBase):
             yield conn
 
 
+def open_metrics_db(db_path: pathlib.Path) -> MetricsDB:
+    """Create a metrics database without touching any global singleton."""
+    return MetricsDB(db_path)
+
+
+_metrics_db: MetricsDB | None = None
+
+
+def get_metrics_db() -> MetricsDB:
+    """Return the global metrics database instance."""
+    if _metrics_db is None:
+        raise RuntimeError("MetricsDB not initialized. Call init_metrics_db() first.")
+    return _metrics_db
+
+
+def init_metrics_db(db_path: pathlib.Path) -> MetricsDB:
+    """Initialize and return the global metrics database instance."""
+    global _metrics_db
+    _metrics_db = open_metrics_db(db_path)
+    return _metrics_db
+
+
+def _reset_metrics_db() -> None:
+    """Reset the global metrics database instance for tests."""
+    global _metrics_db
+    _metrics_db = None
+
+
 __all__ = [
     "HEARTBEAT_TIMEOUT_SEC",
     "AmazonBatchStats",
@@ -62,4 +90,7 @@ __all__ = [
     "SessionStatus",
     "StoreAggregateStats",
     "StoreCrawlStats",
+    "get_metrics_db",
+    "init_metrics_db",
+    "open_metrics_db",
 ]

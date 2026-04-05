@@ -1177,6 +1177,7 @@ source = { editable = "." }
 dependencies = [
     { name = "argon2-cffi" },
     { name = "beautifulsoup4" },
+    { name = "docopt-ng" },
     { name = "flask" },
     { name = "flask-cors" },
     { name = "my-lib" },
@@ -1194,6 +1195,7 @@ dev = [
 requires-dist = [
     { name = "argon2-cffi", specifier = ">=23.1.0" },
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "docopt-ng", specifier = ">=0.9.0" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "flask-cors", specifier = ">=6.0.0" },
     { name = "my-lib", git = "https://github.com/kimata/my-py-lib?rev=22be9e19b8d3ee804d492bb1db2e2938f08cbb8a" },

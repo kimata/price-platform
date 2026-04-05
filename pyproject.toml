@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "argon2-cffi>=23.1.0",
     "beautifulsoup4>=4.12.0",
+    "docopt-ng>=0.9.0",
     "flask>=3.0.0",
     "flask-cors>=6.0.0",
     "my-lib @ git+https://github.com/kimata/my-py-lib@22be9e19b8d3ee804d492bb1db2e2938f08cbb8a",
