@@ -217,7 +217,7 @@ def create_standard_webapi_app(
     connection_getter: Callable[[], price_platform.webapp.SupportsRequestConnection],
     install_dependencies: Callable[
         [flask.Flask, price_platform.webapp.AppDependencies[ConfigT, StoresT, ServicesT]],
-        None,
+        object,
     ],
     logger: logging.Logger | None = None,
 ) -> flask.Flask:
