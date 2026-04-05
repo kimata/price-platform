@@ -214,7 +214,7 @@ def create_standard_webapi_app(
     *,
     definition: StandardWebApiAppDefinition,
     dependencies: price_platform.webapp.AppDependencies[ConfigT, StoresT, ServicesT],
-    connection_getter: Callable[[], object],
+    connection_getter: Callable[[], price_platform.webapp.SupportsRequestConnection],
     install_dependencies: Callable[
         [flask.Flask, price_platform.webapp.AppDependencies[ConfigT, StoresT, ServicesT]],
         None,

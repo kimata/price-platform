@@ -139,7 +139,7 @@ def parse_app_config_for(
             msg = f"{section} configuration is required"
             raise ValueError(msg)
 
-    known_sections = set(REQUIRED_SECTIONS) | set(OPTIONAL_SECTIONS)
+    known_sections: set[str] = set(REQUIRED_SECTIONS) | set(OPTIONAL_SECTIONS)
     warn_unknown_keys(data, known_sections, "config")
 
     if base_dir is None:

@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import hashlib
 from collections.abc import Callable, Generator, Sequence
-from contextlib import AbstractContextManager, contextmanager
+import collections.abc
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import sqlite3
@@ -88,7 +89,7 @@ class SQLiteBootstrapper:
     ) -> None:
         self._db_path = db_path
         self._schema_path = schema_path
-        self._locking_mode = locking_mode
+        self._locking_mode: platform_sqlite.LockingMode = locking_mode
         self._migration_runner = MigrationRunner(migrations)
         self._schema_metadata = SchemaMetadata(name=schema_path.name, source_path=schema_path)
 
@@ -167,7 +168,7 @@ class SQLiteStoreBase:
     ) -> None:
         self._db_path = db_path
         self._schema_path = schema_path
-        self._locking_mode = locking_mode
+        self._locking_mode: platform_sqlite.LockingMode = locking_mode
         self._bootstrapper = SQLiteBootstrapper(
             db_path=db_path,
             schema_path=schema_path,
@@ -181,7 +182,7 @@ class SQLiteStoreBase:
         self._bootstrapper.ensure_ready()
 
     @contextmanager
-    def connection(self) -> AbstractContextManager[sqlite3.Connection]:
+    def connection(self) -> collections.abc.Iterator[sqlite3.Connection]:
         with platform_sqlite.connect(self._db_path, locking_mode=self._locking_mode) as conn:
             conn.row_factory = sqlite3.Row
             yield conn

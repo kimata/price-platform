@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import flask
 
 import price_platform.application
+import price_platform.webapp
 
 
 class _ConnectionStub:
@@ -19,9 +20,9 @@ def test_build_optional_service_factory_respects_enabled_flag(tmp_path: Path) ->
     opened: list[Path] = []
 
     factory = price_platform.application.build_optional_service_factory(
-        enabled=lambda config: config.enabled,
-        path_getter=lambda config: config.path,
-        opener=lambda path: opened.append(path) or path.name,
+        enabled=lambda config: config.enabled,  # type: ignore[attr-defined]
+        path_getter=lambda config: config.path,  # type: ignore[attr-defined]
+        opener=lambda path: opened.append(path) or path.name,  # type: ignore[func-returns-value]
     )
 
     assert factory(SimpleNamespace(enabled=False, path=tmp_path / "disabled.db")) is None

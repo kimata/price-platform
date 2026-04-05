@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 import signal
+import typing
 import unittest.mock
 
 import price_platform.cli
 
 
 def test_lifecycle_controller_requests_shutdown(monkeypatch) -> None:
-    handlers: dict[int, object] = {}
+    handlers: dict[int, typing.Any] = {}  # noqa: UP006
 
     monkeypatch.setattr(
         signal,

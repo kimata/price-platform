@@ -272,7 +272,7 @@ class MetricsDBReadMixin:
             cumulative_product_count=unique_product_count * completed_cycles + current_cycle_products,
         )
 
-    def get_session_status(self, total_product_count: int = 0) -> SessionStatus:
+    def get_session_status(self: MetricsRowMapper, total_product_count: int = 0) -> SessionStatus:
         session = self.get_current_session()
         if session:
             cycle_stats = self.calculate_cycle_stats(session, total_product_count)
@@ -290,7 +290,7 @@ class MetricsDBReadMixin:
             )
         return SessionStatus(is_running=False)
 
-    def is_crawler_healthy(self, max_age_sec: float = 600) -> bool:
+    def is_crawler_healthy(self: MetricsRowMapper, max_age_sec: float = 600) -> bool:
         session = self.get_current_session()
         if session is None:
             logger.warning("No active session found")

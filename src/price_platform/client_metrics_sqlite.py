@@ -6,7 +6,8 @@ import logging
 import pathlib
 import sqlite3
 import threading
-from contextlib import AbstractContextManager, contextmanager
+import collections.abc
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from ._client_metrics_sqlite_models import (
@@ -53,7 +54,7 @@ class ClientMetricsDB(
         schema_path: pathlib.Path | None = None,
     ):
         self._lock = threading.RLock()
-        self._last_aggregated_date: str | None = None
+        self._last_aggregated_date: str | None = None  # type: ignore[assignment]  # mixin infers str, Protocol is str | None
         super().__init__(
             db_path=db_path,
             schema_path=schema_path or resolve_schema_path("sqlite_client_metrics.schema"),
@@ -61,7 +62,7 @@ class ClientMetricsDB(
         )
 
     @contextmanager
-    def _get_connection(self) -> AbstractContextManager[sqlite3.Connection]:
+    def _get_connection(self) -> collections.abc.Iterator[sqlite3.Connection]:
         with self._lock:
             with self.connection() as conn:
                 yield conn

@@ -50,7 +50,7 @@ def test_enqueue_accepts_notification_payload(tmp_path: Path) -> None:
 def test_enqueue_accepts_event_object_for_backward_compatibility(tmp_path: Path) -> None:
     store = NotificationStore(tmp_path / "notification.db")
     queue_id = store.enqueue(
-        _Event(
+        _Event(  # type: ignore[arg-type]  # frozen dataclass vs mutable Protocol attrs
             id=7,
             event_type=_EventType.PRICE_DROP,
             product_id="product-7",

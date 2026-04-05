@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import sqlite3
 from collections.abc import Callable, Generator
-from contextlib import AbstractContextManager, contextmanager
+import collections.abc
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Generic, Literal, Protocol, TypeVar
@@ -87,7 +88,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         )
 
     @contextmanager
-    def _get_connection(self) -> AbstractContextManager[sqlite3.Connection]:
+    def _get_connection(self) -> collections.abc.Iterator[sqlite3.Connection]:
         with self.connection() as conn:
             yield conn
 

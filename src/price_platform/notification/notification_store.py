@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import pathlib
 import sqlite3
-from contextlib import AbstractContextManager, contextmanager
+import collections.abc
+from contextlib import contextmanager
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -64,7 +65,7 @@ class NotificationStore(SQLiteStoreBase):
         )
 
     @contextmanager
-    def _get_connection(self) -> AbstractContextManager[sqlite3.Connection]:
+    def _get_connection(self) -> collections.abc.Iterator[sqlite3.Connection]:
         with self.connection() as conn:
             yield conn
 

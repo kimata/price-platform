@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 from unittest.mock import MagicMock
 
 
@@ -30,7 +31,7 @@ def build_enabled_notification_config_mock() -> MagicMock:
 
 
 def verify_notification_manager_basic_contract(
-    manager_factory: Callable[[MagicMock], object],
+    manager_factory: Callable[[MagicMock], Any],
 ) -> None:
     """通知マネージャーの基本挙動を検証する。"""
     manager = manager_factory(build_disabled_notification_config_mock())
@@ -49,7 +50,7 @@ def verify_notification_manager_basic_contract(
 
 
 def verify_notification_manager_factory_contract(
-    init_manager: Callable[[MagicMock], object],
+    init_manager: Callable[[MagicMock], Any],
 ) -> None:
     """ファクトリが毎回新しいインスタンスを返すことを検証する。"""
     config = build_disabled_notification_config_mock()
@@ -61,7 +62,7 @@ def verify_notification_manager_factory_contract(
 
 
 def verify_notification_manager_enabled_start_contract(
-    manager: object,
+    manager: Any,
     *,
     expected_store: object,
 ) -> None:
@@ -71,7 +72,7 @@ def verify_notification_manager_enabled_start_contract(
 
 
 def verify_notification_manager_skips_disabled_event_contract(
-    manager: object,
+    manager: Any,
     *,
     event_factory: Callable[[], MagicMock] | None = None,
 ) -> None:

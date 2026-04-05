@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Protocol
 
-LockingMode = str
+from price_platform.platform.sqlite import LockingMode as LockingMode
 
 
 class DeliveryStatus(Enum):

@@ -7,7 +7,7 @@ import pathlib
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeVar
 
 from price_platform.platform import browser
 
@@ -18,7 +18,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MakerT = TypeVar("MakerT")
-ConfigT = TypeVar("ConfigT")
+class _SeleniumConfigOwner(Protocol):
+    @property
+    def selenium(self) -> _SeleniumConfigLike: ...
+
+
+class _SeleniumConfigLike(Protocol):
+    @property
+    def data_path(self) -> pathlib.Path: ...
+
+
+ConfigT = TypeVar("ConfigT", bound=_SeleniumConfigOwner)
 
 
 @dataclass

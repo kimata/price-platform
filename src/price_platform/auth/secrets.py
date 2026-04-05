@@ -14,9 +14,11 @@ class SecretStore(Protocol):
 
     def load(self) -> str:
         """Load an existing secret."""
+        ...
 
     def ensure(self) -> str:
         """Load a secret or create it on first use."""
+        ...
 
 
 class FileSecretStore:

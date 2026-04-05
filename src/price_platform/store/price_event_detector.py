@@ -66,11 +66,12 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
         self.event_types = event_types
         self.period_event_map = dict(period_event_map)
         self.flea_market_stores = frozenset(flea_market_stores)
+        self.event_factory: EventFactoryProtocol[PriceEventT]
         if hasattr(event_factory, "create_event"):
-            self.event_factory = event_factory
+            self.event_factory = event_factory  # type: ignore[assignment, invalid-assignment]
         else:
-            self.event_factory = KeywordEventFactory(event_factory)
-        self.event_extra_fields = event_extra_fields or (lambda _record: {})
+            self.event_factory = KeywordEventFactory(event_factory)  # type: ignore[arg-type]
+        self.event_extra_fields: EventMetadataAdapter[PriceRecordT] = event_extra_fields or (lambda record: {})
         self.config = config or PriceEventConfig()
 
     def _build_event(self, draft: PriceEventDraft) -> PriceEventT:

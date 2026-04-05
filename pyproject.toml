@@ -21,7 +21,12 @@ authors = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
+    "pyright>=1.1.408",
     "pytest>=9.0.0",
+    "ty>=0.0.1a7",
+    "types-pyyaml>=6.0.12",
+    "types-requests>=2.32.4",
 ]
 
 [build-system]
@@ -37,6 +42,42 @@ allow-direct-references = true
 
 [tool.uv]
 default-groups = ["dev"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = [
+    "^tests/",
+    "^.venv/",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+include = ["src", "tests"]
+reportMissingImports = false
+
+[tool.ty]
+[tool.ty.rules]
+unresolved-import = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/price_platform/store/_price_event_suppression.py"]
+[tool.ty.overrides.rules]
+invalid-argument-type = "warn"
+
+[[tool.ty.overrides]]
+include = ["src/price_platform/store/price_event_detector.py"]
+[tool.ty.overrides.rules]
+invalid-assignment = "warn"
+
+[[tool.ty.overrides]]
+include = ["src/price_platform/webapp/app_factory.py"]
+[tool.ty.overrides.rules]
+invalid-assignment = "warn"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

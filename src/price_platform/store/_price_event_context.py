@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Generic
 
 from price_platform.platform import clock
 
@@ -11,7 +12,7 @@ from ._price_event_types import PriceContext, PriceEventConfig, PriceRecordT, Pr
 
 
 @dataclass(frozen=True)
-class PriceContextBuilder:
+class PriceContextBuilder(Generic[PriceRecordT, SoldRecordT]):
     price_store: PriceStoreProtocol[PriceRecordT, SoldRecordT]
     config: PriceEventConfig
 

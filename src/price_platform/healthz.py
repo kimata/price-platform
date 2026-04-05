@@ -109,6 +109,7 @@ def run_healthz_cli(definition: HealthzCliDefinition, doc: str) -> None:
     logging.info("設定ファイル: %s", config_file)
 
     config = definition.config_loader(config_file)
+    targets: tuple[str, ...]
     if args["--web"]:
         targets = ("web",)
     elif args["--crawler"]:

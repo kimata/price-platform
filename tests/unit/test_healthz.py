@@ -81,4 +81,4 @@ def test_check_web_servers_reports_shared_targets(monkeypatch) -> None:
     )
 
     assert price_platform.healthz.check_web_servers(SimpleNamespace(), definition) is True
-    assert [target.name for target in captured] == ["flask-api", "node-ssr"]
+    assert [target.name for target in captured] == ["flask-api", "node-ssr"]  # type: ignore[union-attr]

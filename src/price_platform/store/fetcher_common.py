@@ -23,8 +23,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ProductT = TypeVar("ProductT")
-ScrapedPriceT = TypeVar("ScrapedPriceT")
+class _HasName(Protocol):
+    @property
+    def name(self) -> str: ...
+
+
+class _HasPrice(Protocol):
+    @property
+    def price(self) -> int: ...
+
+
+ProductT = TypeVar("ProductT", bound=_HasName)
+ScrapedPriceT = TypeVar("ScrapedPriceT", bound=_HasPrice)
 StoreT = TypeVar("StoreT")
 
 

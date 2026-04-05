@@ -12,6 +12,30 @@ stages:
     - test
     - renovate
 
+test-typecheck:
+    stage: test
+
+    needs: []
+
+    before_script:
+        - uv sync --frozen --no-editable
+
+    script:
+        - uv run python -m pyright
+        - uv run mypy src/
+        - uv run ty check src/
+
+    cache:
+        - key:
+              files:
+                  - uv.lock
+          fallback_keys:
+              - uv-cache-${CI_PROJECT_ID}
+          policy: pull
+          paths:
+              - ${UV_CACHE_DIR}
+              - .mypy_cache/
+
 test-pytest:
     stage: test
 

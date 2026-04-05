@@ -64,7 +64,7 @@ def install_common_routes(
     @app.errorhandler(Exception)
     def handle_exception(error: Exception) -> flask.Response | tuple[flask.Response, int]:
         if isinstance(error, werkzeug.exceptions.HTTPException):
-            return error.get_response()
+            return flask.make_response(error.get_response())
         app_logger.exception("Unhandled exception: %s", error)
         return flask.jsonify({"error": "Internal Server Error"}), 500
 

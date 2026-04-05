@@ -13,7 +13,15 @@ from ..config import WebPushConfig
 
 logger = logging.getLogger(__name__)
 
-EventT = TypeVar("EventT")
+class _PriceEventLike(Protocol):
+    """WebPush 送信に必要な最小イベント属性。"""
+
+    event_type: Any
+    price: int
+    store: Any
+
+
+EventT = TypeVar("EventT", bound=_PriceEventLike)
 ProductT = TypeVar("ProductT")
 SubscriptionT = TypeVar("SubscriptionT", bound="SubscriptionProtocol")
 StoreT = TypeVar("StoreT", bound="WebPushStoreProtocol")

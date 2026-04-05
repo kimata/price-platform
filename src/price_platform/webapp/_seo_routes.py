@@ -22,12 +22,13 @@ def install_seo_routes(app: flask.Flask, spec: SeoRoutesSpec) -> None:
         response.headers["Cache-Control"] = f"public, max-age={spec.robots_cache_max_age}"
         return response
 
-    if spec.image_sitemap_builder is None:
+    image_builder = spec.image_sitemap_builder
+    if image_builder is None:
         return
 
     @app.route(f"{spec.url_prefix}/sitemap-images.xml")
     def sitemap_images() -> flask.Response:
-        response = flask.make_response(spec.image_sitemap_builder())
+        response = flask.make_response(image_builder())
         response.headers["Content-Type"] = "application/xml; charset=utf-8"
         response.headers["Cache-Control"] = f"public, max-age={spec.image_sitemap_cache_max_age}"
         return response

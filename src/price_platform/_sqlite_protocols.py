@@ -13,7 +13,7 @@ from ._client_metrics_sqlite_models import (
     WebVitalBoxplotData,
     WebVitalName,
 )
-from ._metrics_sqlite_models import AmazonBatchStats, CrawlSession, ItemCrawlStats
+from ._metrics_sqlite_models import AmazonBatchStats, CrawlSession, CycleStats, ItemCrawlStats
 
 
 class SQLiteConnectionProvider(Protocol):
@@ -26,6 +26,8 @@ class ClientMetricsAggregateProvider(SQLiteConnectionProvider, Protocol):
     """クライアントメトリクスの日次集計に必要な状態を持つインターフェース。"""
 
     _last_aggregated_date: str | None
+
+    def aggregate_daily(self, date: str) -> int: ...
 
     def aggregate_web_vitals_daily(self, date: str) -> int: ...
 
@@ -62,3 +64,11 @@ class MetricsRowMapper(SQLiteConnectionProvider, Protocol):
     def _row_to_item_stats(self, row: sqlite3.Row) -> ItemCrawlStats: ...
 
     def _row_to_amazon_batch(self, row: sqlite3.Row) -> AmazonBatchStats: ...
+
+    def get_current_session(self) -> CrawlSession | None: ...
+
+    def get_unique_product_count_for_session(self, session_id: int) -> int: ...
+
+    def get_total_item_count_for_session(self, session_id: int) -> int: ...
+
+    def calculate_cycle_stats(self, session: CrawlSession, total_product_count: int) -> CycleStats: ...

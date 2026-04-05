@@ -6,13 +6,15 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from ._price_event_types import PriceContext, PriceEventConfig, PriceEventDraft, PriceRecordT, SoldRecordT
+from typing import Any
+
+from ._price_event_types import PriceContext, PriceEventConfig, PriceEventDraft, PriceRecordProtocol, PriceRecordT, SoldRecordT
 
 logger = logging.getLogger(__name__)
 
 
 def build_event_draft(
-    record: PriceRecordT,
+    record: PriceRecordProtocol[Any],
     *,
     event_type: Any,
     product_id: str,
@@ -140,7 +142,7 @@ def check_price_drop(
 
 def check_good_used_deal(
     product_id: str,
-    used: PriceRecordT,
+    used: PriceRecordProtocol[Any],
     new_price: int,
     now: datetime,
     *,

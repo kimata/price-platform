@@ -15,6 +15,7 @@ class SupportsRequestConnection(Protocol):
 
     def request_connection(self) -> contextlib.AbstractContextManager[object]:
         """Return a context manager that binds a shared connection for the current request."""
+        ...
 
 
 def install_request_hooks(

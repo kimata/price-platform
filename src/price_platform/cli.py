@@ -26,7 +26,7 @@ def setup_logging(verbose: bool = False) -> None:
 class LifecycleController:
     """Own shutdown state for a single CLI or WebUI process."""
 
-    manager: LifecycleManager = field(default_factory=LifecycleManager)
+    manager: LifecycleManager = field(default_factory=lambda: LifecycleManager())
 
     def reset(self) -> None:
         """Reset graceful and force-exit state."""

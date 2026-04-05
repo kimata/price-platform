@@ -8,18 +8,21 @@ from datetime import datetime
 from typing import Any, Generic, Protocol, TypeVar
 
 StoreTypeT = TypeVar("StoreTypeT")
+StoreTypeT_co = TypeVar("StoreTypeT_co", covariant=True)
 PriceEventT = TypeVar("PriceEventT", bound="DetectedPriceEventProtocol")
+PriceEventT_co = TypeVar("PriceEventT_co", bound="DetectedPriceEventProtocol", covariant=True)
 PriceRecordT = TypeVar("PriceRecordT", bound="PriceRecordProtocol[Any]")
+PriceRecordT_contra = TypeVar("PriceRecordT_contra", bound="PriceRecordProtocol[Any]", contravariant=True)
 SoldRecordT = TypeVar("SoldRecordT", bound="SoldRecordProtocol")
 
 
-class PriceRecordProtocol(Protocol[StoreTypeT]):
+class PriceRecordProtocol(Protocol[StoreTypeT_co]):
     @property
     def price(self) -> int: ...
     @property
     def is_used(self) -> bool: ...
     @property
-    def store(self) -> StoreTypeT: ...
+    def store(self) -> StoreTypeT_co: ...
     @property
     def url(self) -> str | None: ...
     @property
@@ -85,12 +88,12 @@ class PriceEventDraft:
         return payload
 
 
-class EventFactoryProtocol(Protocol[PriceEventT]):
-    def create_event(self, draft: PriceEventDraft) -> PriceEventT: ...
+class EventFactoryProtocol(Protocol[PriceEventT_co]):
+    def create_event(self, draft: PriceEventDraft) -> PriceEventT_co: ...
 
 
-class EventMetadataAdapter(Protocol[PriceRecordT]):
-    def __call__(self, record: PriceRecordT) -> Mapping[str, object | None]: ...
+class EventMetadataAdapter(Protocol[PriceRecordT_contra]):
+    def __call__(self, record: PriceRecordT_contra) -> Mapping[str, object | None]: ...
 
 
 class DetectedPriceEventProtocol(Protocol):

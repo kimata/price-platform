@@ -15,8 +15,32 @@ from .webpush_sender import WebPushResult, build_detail_url
 
 logger = logging.getLogger(__name__)
 
-ConfigT = TypeVar("ConfigT")
-EventT = TypeVar("EventT")
+class _NotificationConfigLike(Protocol):
+    """通知マネージャーが必要とする最小設定インターフェース。"""
+
+    @property
+    def notification(self) -> Any: ...
+
+    @property
+    def webapp(self) -> Any: ...
+
+    def get_absolute_path(self, path: Any) -> Path: ...
+
+
+class _NotifiableEventLike(Protocol):
+    """通知マネージャーが必要とする最小イベントインターフェース。"""
+
+    twitter_enabled: bool
+    event_type: Any
+    product_id: str
+    price: int
+    store: Any
+
+    def format_message(self, display_name: str) -> str: ...
+
+
+ConfigT = TypeVar("ConfigT", bound=_NotificationConfigLike)
+EventT = TypeVar("EventT", bound=_NotifiableEventLike)
 ProductT = TypeVar("ProductT")
 CatalogT = TypeVar("CatalogT")
 NotificationStoreT = TypeVar("NotificationStoreT", bound="NotificationStoreProtocol[Any]")
@@ -24,11 +48,14 @@ TwitterPosterT = TypeVar("TwitterPosterT", bound="TwitterPosterProtocol")
 WebPushStoreT = TypeVar("WebPushStoreT")
 WebPushSenderT = TypeVar("WebPushSenderT", bound="WebPushSenderProtocol[Any, Any]")
 
+_EventT_contra = TypeVar("_EventT_contra", contravariant=True)
+_ProductT_contra = TypeVar("_ProductT_contra", contravariant=True)
 
-class NotificationStoreProtocol(Protocol[EventT]):
+
+class NotificationStoreProtocol(Protocol[_EventT_contra]):
     """通知ストアに必要な最小インターフェース。"""
 
-    def enqueue(self, event: EventT, message: str) -> object: ...
+    def enqueue(self, event: _EventT_contra, message: str) -> object: ...
 
 
 class TwitterPosterProtocol(Protocol):
@@ -43,10 +70,10 @@ class TwitterPosterProtocol(Protocol):
     def notify_new_item(self) -> None: ...
 
 
-class WebPushSenderProtocol(Protocol[EventT, ProductT]):
+class WebPushSenderProtocol(Protocol[_EventT_contra, _ProductT_contra]):
     """Web Push 送信クラスに必要な最小インターフェース。"""
 
-    def send_to_all(self, event: EventT, product: ProductT) -> WebPushResult: ...
+    def send_to_all(self, event: _EventT_contra, product: _ProductT_contra) -> WebPushResult: ...
 
 
 @dataclass(frozen=True)
@@ -115,14 +142,14 @@ def build_notification_runtime(
     open_notification_store: Callable[[Path], NotificationStoreT],
     create_twitter_poster: Callable[[TwitterConfig, NotificationStoreT], TwitterPosterT],
     open_webpush_store: Callable[[Path], WebPushStoreT],
-    webpush_sender_type: type[WebPushSenderT],
+    webpush_sender_factory: Callable[..., WebPushSenderT],
 ) -> NotificationRuntime[NotificationStoreT, TwitterPosterT, WebPushStoreT, WebPushSenderT]:
     """通知 runtime を標準形で構築する。"""
     return NotificationRuntime(
         open_notification_store=open_notification_store,
         create_twitter_poster=create_twitter_poster,
         open_webpush_store=open_webpush_store,
-        create_webpush_sender=lambda config, store, external_url: webpush_sender_type(
+        create_webpush_sender=lambda config, store, external_url: webpush_sender_factory(
             config=config,
             store=store,
             external_url=external_url,

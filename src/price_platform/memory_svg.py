@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 from datetime import datetime
 from xml.sax.saxutils import escape
 
@@ -116,7 +117,7 @@ def generate_memory_usage_svg(
     )
 
 
-def _build_line_path(points: tuple[tuple[float, float], ...] | list[tuple[float, float]] | object) -> str:
+def _build_line_path(points: tuple[tuple[float, float], ...] | list[tuple[float, float]] | collections.abc.Iterable[tuple[float, float]]) -> str:
     point_list = list(points)
     if not point_list:
         return ""
