@@ -15,6 +15,8 @@ MetricsDbT = TypeVar("MetricsDbT")
 ClientMetricsDbT = TypeVar("ClientMetricsDbT")
 NotificationStoreT = TypeVar("NotificationStoreT")
 WebPushStoreT = TypeVar("WebPushStoreT")
+StoresT = TypeVar("StoresT")
+ServicesT = TypeVar("ServicesT")
 
 
 @dataclass(frozen=True)
@@ -77,6 +79,31 @@ def build_standard_webapi_dependency_spec(
             price_event_store_type=price_event_store_type,
         ),
         service_builder=service_builder,
+    )
+
+
+def build_standard_webapi_context(
+    *,
+    extension_key: str,
+    price_store_type: type[PriceStoreT],
+    price_event_store_type: type[PriceEventStoreT],
+    service_builder: Callable[
+        [ConfigT],
+        price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT],
+    ],
+) -> price_platform.webapp.WebApiContext[
+    ConfigT,
+    price_platform.store_runtime.StoreRuntime[PriceStoreT, PriceEventStoreT],
+    price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT],
+]:
+    """標準 spec と accessor 群をまとめた Web API context を作る。"""
+    return price_platform.webapp.build_webapi_context(
+        build_standard_webapi_dependency_spec(
+            extension_key=extension_key,
+            price_store_type=price_store_type,
+            price_event_store_type=price_event_store_type,
+            service_builder=service_builder,
+        )
     )
 
 

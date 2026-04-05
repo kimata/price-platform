@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-import signal
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
+
+from my_lib.lifecycle import install_double_tap_shutdown_handlers
 
 from .managers.lifecycle_manager import LifecycleManager
 
@@ -26,12 +27,10 @@ class LifecycleController:
     """Own shutdown state for a single CLI or WebUI process."""
 
     manager: LifecycleManager = field(default_factory=LifecycleManager)
-    _force_exit_requested: bool = False
 
     def reset(self) -> None:
         """Reset graceful and force-exit state."""
         self.manager.reset()
-        self._force_exit_requested = False
 
     def request_shutdown(self, exit_reason: str = "shutdown") -> None:
         """Request graceful shutdown for the attached lifecycle manager."""
@@ -45,21 +44,12 @@ class LifecycleController:
         on_shutdown: Callable[[str], None] | None = None,
     ) -> None:
         """Install SIGINT/SIGTERM handlers with double-tap force exit behavior."""
-
-        def signal_handler(signum: int, _frame: object) -> None:
-            if self._force_exit_requested:
-                logger.warning("強制終了します")
-                exit_fn(1)
-
-            self._force_exit_requested = True
-            exit_reason = "sigterm" if signum == signal.SIGTERM else "sigint"
-            logger.info(f"シャットダウン中 ({exit_reason})... (もう一度 Ctrl-C で強制終了)")
-            self.request_shutdown(exit_reason)
-            if on_shutdown is not None:
-                on_shutdown(exit_reason)
-
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
+        install_double_tap_shutdown_handlers(
+            self.manager,
+            logger=logger,
+            exit_fn=exit_fn,
+            on_shutdown=on_shutdown,
+        )
 
 
 def initialize_cli(

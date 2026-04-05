@@ -108,6 +108,37 @@ class WebApiDependencySpec(Generic[ConfigT, StoresT, ServicesT]):
     service_builder: Callable[[ConfigT], ServicesT]
 
 
+@dataclass(frozen=True)
+class WebApiContext(Generic[ConfigT, StoresT, ServicesT]):
+    """Web API 依存構成と accessor 群をまとめたコンテキスト。"""
+
+    spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT]
+
+    def build_dependencies(self, config: ConfigT) -> AppDependencies[ConfigT, StoresT, ServicesT]:
+        """spec に基づいて依存コンテナを構築する。"""
+        return build_webapi_dependencies(config, self.spec)
+
+    def install_dependencies(
+        self,
+        app: flask.Flask,
+        dependencies: AppDependencies[ConfigT, StoresT, ServicesT],
+    ) -> AppDependencies[ConfigT, StoresT, ServicesT]:
+        """依存コンテナを Flask アプリへ登録する。"""
+        return install_webapi_dependencies(app, self.spec, dependencies)
+
+    def get_config(self) -> ConfigT:
+        """現在のアプリ設定を返す。"""
+        return get_webapi_config(self.spec)
+
+    def get_dependencies(self) -> AppDependencies[ConfigT, StoresT, ServicesT]:
+        """現在の依存コンテナを返す。"""
+        return get_webapi_dependencies(self.spec)
+
+    def get_services(self) -> ServicesT:
+        """現在のサービス束を返す。"""
+        return get_webapi_services(self.spec)
+
+
 def build_app_services(
     *,
     metrics_db: MetricsDbT | None = None,
@@ -201,3 +232,10 @@ def get_webapi_config(spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT]) -
 def get_webapi_services(spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT]) -> ServicesT:
     """spec に対応するサービス束を返す。"""
     return get_webapi_dependencies(spec).services
+
+
+def build_webapi_context(
+    spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT],
+) -> WebApiContext[ConfigT, StoresT, ServicesT]:
+    """spec から標準的な Web API context を構築する。"""
+    return WebApiContext(spec=spec)

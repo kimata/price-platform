@@ -50,12 +50,33 @@ class WebPushSenderProtocol(Protocol[EventT, ProductT]):
 
 
 @dataclass(frozen=True)
+class SelectionKeyStrategy(Generic[EventT, ProductT]):
+    """通知リンクの selection key を解決する戦略。"""
+
+    resolve: Callable[[EventT, ProductT | None], str | None]
+
+
+@dataclass(frozen=True)
+class ProductLineStrategy(Generic[EventT, ProductT]):
+    """通知文面用の商品名行を組み立てる戦略。"""
+
+    build: Callable[[ProductT, EventT], str]
+
+
+@dataclass(frozen=True)
+class SocialCopyStrategy(Generic[ProductT]):
+    """SNS 投稿向け補足文言を組み立てる戦略。"""
+
+    build: Callable[[ProductT], SocialCopyMetadata]
+
+
+@dataclass(frozen=True)
 class NotificationStrategies(Generic[EventT, ProductT]):
     """通知文面生成に使う差し替え戦略群。"""
 
-    selection_key_resolver: Callable[[EventT, ProductT | None], str | None]
-    product_line_builder: Callable[[ProductT, EventT], str]
-    social_copy_builder: Callable[[ProductT], SocialCopyMetadata]
+    selection_key: SelectionKeyStrategy[EventT, ProductT]
+    product_line: ProductLineStrategy[EventT, ProductT]
+    social_copy: SocialCopyStrategy[ProductT]
 
 
 @dataclass(frozen=True)
@@ -116,12 +137,12 @@ def build_social_message(
     strategies: NotificationStrategies[EventT, ProductT],
 ) -> str:
     """戦略群を使って SNS 投稿文面を組み立てる。"""
-    selection_key = strategies.selection_key_resolver(event, product)
+    selection_key = strategies.selection_key.resolve(event, product)
     detail_url = build_detail_url(external_url, getattr(event, "product_id"), selection_key)
     post = compose_social_post(
         SocialPostContext(
             product_id=getattr(event, "product_id"),
-            product_line=strategies.product_line_builder(product, event),
+            product_line=strategies.product_line.build(product, event),
             detail_url=detail_url,
             event_type_value=getattr(getattr(event, "event_type"), "value"),
             event_type_label=getattr(getattr(event, "event_type"), "label"),
@@ -134,7 +155,7 @@ def build_social_message(
             period_days=getattr(event, "period_days"),
             recorded_at=getattr(event, "recorded_at"),
             hashtag=getattr(product, "hashtag"),
-            social_copy=strategies.social_copy_builder(product),
+            social_copy=strategies.social_copy.build(product),
         )
     )
     return post.message
