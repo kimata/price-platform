@@ -55,13 +55,14 @@ _ProductT_contra = TypeVar("_ProductT_contra", contravariant=True)
 class NotificationStoreProtocol(Protocol[_EventT_contra]):
     """通知ストアに必要な最小インターフェース。"""
 
-    def enqueue(self, event: _EventT_contra, message: str) -> object: ...
+    def enqueue(self, event_or_payload: _EventT_contra, message: str | None = None) -> object: ...
 
 
 class TwitterPosterProtocol(Protocol):
     """投稿ワーカーに必要な最小インターフェース。"""
 
-    is_running: bool
+    @property
+    def is_running(self) -> bool: ...
 
     def start(self) -> None: ...
 
