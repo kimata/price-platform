@@ -32,7 +32,7 @@ from .request_context import SupportsRequestConnection, install_request_hooks
 
 def configure_app(app: flask.Flask, settings: WebAppSettings) -> flask.Flask:
     if settings.enable_proxy_fix:
-        app.wsgi_app = werkzeug.middleware.proxy_fix.ProxyFix(  # type: ignore[assignment, invalid-assignment]
+        app.wsgi_app = werkzeug.middleware.proxy_fix.ProxyFix(  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
             app.wsgi_app,
             x_for=1,
             x_proto=1,
@@ -43,7 +43,7 @@ def configure_app(app: flask.Flask, settings: WebAppSettings) -> flask.Flask:
     flask_cors.CORS(app, origins=get_cors_origins(settings.external_url))
 
     if hasattr(app, "json") and hasattr(app.json, "compat"):
-        app.json.compat = True  # type: ignore[attr-defined, invalid-assignment]
+        app.json.compat = True  # type: ignore[attr-defined]  # ty: ignore[invalid-assignment]
 
     @app.after_request
     def add_response_headers(response: flask.Response) -> flask.Response:

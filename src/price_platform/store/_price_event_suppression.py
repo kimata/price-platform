@@ -47,14 +47,14 @@ def apply_event_suppression(
     if existing is None:
         event_id = event_store.save_event(best_new)
         logger.info("新規イベント保存: %s - %s (ID: %s)", _event_label(best_new), product_id, event_id)
-        return [replace(best_new, id=event_id)]  # type: ignore[type-var, invalid-argument-type]
+        return [replace(best_new, id=event_id)]  # type: ignore[type-var]  # ty: ignore[invalid-argument-type]
 
     if best_new.priority < existing.priority:
         event_id = event_store.save_event(best_new)
         if existing.id:
             event_store.suppress_event(existing.id, event_id)
         logger.info("イベント上書き: %s → %s - %s", _event_label(existing), _event_label(best_new), product_id)
-        return [replace(best_new, id=event_id)]  # type: ignore[type-var, invalid-argument-type]
+        return [replace(best_new, id=event_id)]  # type: ignore[type-var]  # ty: ignore[invalid-argument-type]
 
     logger.debug("イベント抑制: %s (既存: %s) - %s", _event_label(best_new), _event_label(existing), product_id)
     return []
