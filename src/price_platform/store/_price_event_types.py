@@ -97,12 +97,18 @@ class EventMetadataAdapter(Protocol[PriceRecordT_contra]):
 
 
 class DetectedPriceEventProtocol(Protocol):
-    id: int | None
-    event_type: Any
-    priority: int
-    product_id: str
-    store: Any
-    price: int
+    @property
+    def id(self) -> int | None: ...
+    @property
+    def event_type(self) -> Any: ...
+    @property
+    def priority(self) -> int: ...
+    @property
+    def product_id(self) -> str: ...
+    @property
+    def store(self) -> Any: ...
+    @property
+    def price(self) -> int: ...
 
 
 @dataclass
