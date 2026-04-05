@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Generic, TypeVar
 
 import flask
 
 import price_platform.store_runtime
 import price_platform.webapp
+from price_platform.identity import AppIdentity
 
 ConfigT = TypeVar("ConfigT")
 PriceStoreT = TypeVar("PriceStoreT")
@@ -22,6 +23,17 @@ WebPushStoreT = TypeVar("WebPushStoreT")
 StoresT = TypeVar("StoresT")
 ServicesT = TypeVar("ServicesT")
 ServiceT = TypeVar("ServiceT")
+
+COMMON_HTML_CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com "
+    "https://b.st-hatena.com https://bookmark.hatenaapis.com; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https:; "
+    "font-src 'self'; "
+    "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com; "
+    "frame-ancestors 'none';"
+)
 
 
 @dataclass(frozen=True)
@@ -56,6 +68,44 @@ class StandardWebApiAppDefinition:
     route_installers: tuple[Callable[[flask.Flask], None], ...] = ()
     warmup_steps: tuple[Callable[[], object], ...] = ()
     flea_thumb_subdir: str = "fleama_thumb"
+
+    @classmethod
+    def from_identity(
+        cls,
+        identity: AppIdentity,
+        *,
+        base_dir: Path,
+        cache_rules: tuple[price_platform.webapp.CacheRule, ...] = (),
+        html_content_security_policy: str | None = None,
+        blueprints: tuple[price_platform.webapp.BlueprintRegistration, ...] = (),
+        optional_blueprints: tuple[price_platform.webapp.OptionalBlueprintRegistration, ...] = (),
+        route_installers: tuple[Callable[[flask.Flask], None], ...] = (),
+        warmup_steps: tuple[Callable[[], object], ...] = (),
+    ) -> "StandardWebApiAppDefinition":
+        return cls(
+            app_name=identity.resolved_flask_app_name,
+            url_prefix=identity.url_prefix,
+            base_dir=base_dir,
+            cache_rules=cache_rules,
+            html_content_security_policy=html_content_security_policy,
+            blueprints=blueprints,
+            optional_blueprints=optional_blueprints,
+            route_installers=route_installers,
+            warmup_steps=warmup_steps,
+            flea_thumb_subdir=identity.flea_thumb_subdir,
+        )
+
+
+def _resolve_extension_key(*, extension_key: str | None, identity: AppIdentity | None) -> str:
+    if extension_key is not None and identity is not None:
+        msg = "extension_key and identity cannot both be provided"
+        raise ValueError(msg)
+    if identity is not None:
+        return identity.extension_key
+    if extension_key is None:
+        msg = "extension_key or identity is required"
+        raise ValueError(msg)
+    return extension_key
 
 
 def build_store_runtime_builder(
@@ -108,7 +158,8 @@ def build_service_builder(
 
 def build_standard_webapi_dependency_spec(
     *,
-    extension_key: str,
+    extension_key: str | None = None,
+    identity: AppIdentity | None = None,
     price_store_type: type[PriceStoreT],
     price_event_store_type: type[PriceEventStoreT],
     service_builder: Callable[
@@ -122,7 +173,7 @@ def build_standard_webapi_dependency_spec(
 ]:
     """標準的な Web API dependency spec を作る。"""
     return price_platform.webapp.WebApiDependencySpec(
-        extension_key=extension_key,
+        extension_key=_resolve_extension_key(extension_key=extension_key, identity=identity),
         store_builder=build_store_runtime_builder(
             price_store_type=price_store_type,
             price_event_store_type=price_event_store_type,
@@ -133,7 +184,8 @@ def build_standard_webapi_dependency_spec(
 
 def build_standard_webapi_context(
     *,
-    extension_key: str,
+    extension_key: str | None = None,
+    identity: AppIdentity | None = None,
     price_store_type: type[PriceStoreT],
     price_event_store_type: type[PriceEventStoreT],
     service_builder: Callable[
@@ -149,6 +201,7 @@ def build_standard_webapi_context(
     return price_platform.webapp.build_webapi_context(
         build_standard_webapi_dependency_spec(
             extension_key=extension_key,
+            identity=identity,
             price_store_type=price_store_type,
             price_event_store_type=price_event_store_type,
             service_builder=service_builder,
@@ -200,6 +253,54 @@ def create_standard_webapi_app(
     )
     install_dependencies(app, dependencies)
     return app
+
+
+def create_standard_seo_route_installer(
+    *,
+    url_prefix: str,
+    sitemap_builder: Callable[[], str],
+    robots_builder: Callable[[], str],
+    image_sitemap_builder: Callable[[], str] | None = None,
+) -> Callable[[flask.Flask], None]:
+    """Build a route installer for the standard SEO endpoints."""
+
+    def install_routes(app: flask.Flask) -> None:
+        price_platform.webapp.install_seo_routes(
+            app,
+            price_platform.webapp.SeoRoutesSpec(
+                url_prefix=url_prefix,
+                sitemap_builder=sitemap_builder,
+                robots_builder=robots_builder,
+                image_sitemap_builder=image_sitemap_builder,
+            ),
+        )
+
+    return install_routes
+
+
+def build_optional_webpush_blueprint_registration(
+    *,
+    url_prefix: str,
+    loader: Callable[[], flask.Blueprint],
+    missing_message: str = "WebPush API module not available, skipping registration",
+) -> price_platform.webapp.OptionalBlueprintRegistration:
+    """Build the canonical optional WebPush blueprint registration."""
+    return price_platform.webapp.OptionalBlueprintRegistration(
+        loader=loader,
+        url_prefix=f"{url_prefix}/api/webpush",
+        missing_message=missing_message,
+    )
+
+
+def notify_price_update(product_id: str) -> None:
+    """Emit the shared content update event after a price change."""
+    _ = product_id
+    price_platform.webapp.notify_content_update()
+
+
+def notify_scrape_complete() -> None:
+    """Emit the shared content update event after a scrape completes."""
+    price_platform.webapp.notify_content_update()
 
 
 def build_store_runtime(

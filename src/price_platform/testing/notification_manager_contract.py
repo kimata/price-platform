@@ -58,3 +58,25 @@ def verify_notification_manager_factory_contract(
 
     assert type(first) is type(second)
     assert first is not second
+
+
+def verify_notification_manager_enabled_start_contract(
+    manager: object,
+    *,
+    expected_store: object,
+) -> None:
+    """通知有効時に store が設定され poster が未構築なことを検証する。"""
+    assert manager.store is expected_store
+    assert manager.poster is None
+
+
+def verify_notification_manager_skips_disabled_event_contract(
+    manager: object,
+    *,
+    event_factory: Callable[[], MagicMock] | None = None,
+) -> None:
+    """twitter 無効イベントを enqueue しても store を叩かないことを検証する。"""
+    event = event_factory() if event_factory is not None else MagicMock()
+    event.twitter_enabled = False
+    manager.enqueue(event)
+    manager.store.enqueue.assert_not_called()

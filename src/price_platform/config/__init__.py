@@ -30,7 +30,7 @@ from .models import (
     WebPushConfig,
     YahooStoreConfig,
 )
-from .profiled import ProfiledAppConfig
+from .profiled import ProfiledAppConfig, build_cached_config_loader, create_profiled_app_config
 
 __all__ = [
     "AmazonStoreConfig",
@@ -54,6 +54,8 @@ __all__ = [
     "WebAppDataConfig",
     "WebPushConfig",
     "YahooStoreConfig",
+    "build_cached_config_loader",
+    "create_profiled_app_config",
     "load_app_config",
     "load_app_config_for",
     "parse_app_config",

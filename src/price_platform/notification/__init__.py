@@ -17,6 +17,7 @@ from .manager import (
     build_social_message,
     build_twitter_config,
 )
+from ._notification_payload import NotificationPayload
 from .notification_store import (
     NotificationItem,
     NotificationStatus,
@@ -41,6 +42,7 @@ __all__ = [
     "DeliveryLogEntry",
     "DeliveryStatus",
     "NotificationItem",
+    "NotificationPayload",
     "NotificationPresentation",
     "NotificationRuntime",
     "NotificationStrategies",
