@@ -24,19 +24,28 @@ class _NotificationConfigLike(Protocol):
     @property
     def webapp(self) -> Any: ...
 
-    def get_absolute_path(self, path: Any) -> Path: ...
+    def get_absolute_path(self, relative_path: Any) -> Path: ...
 
 
 class _NotifiableEventLike(Protocol):
     """通知マネージャーが必要とする最小イベントインターフェース。"""
 
-    twitter_enabled: bool
-    event_type: Any
-    product_id: str
-    price: int
-    store: Any
+    @property
+    def twitter_enabled(self) -> bool: ...
 
-    def format_message(self, display_name: str) -> str: ...
+    @property
+    def event_type(self) -> Any: ...
+
+    @property
+    def product_id(self) -> str: ...
+
+    @property
+    def price(self) -> int: ...
+
+    @property
+    def store(self) -> Any: ...
+
+    def format_message(self, product_name: str) -> str: ...
 
 
 ConfigT = TypeVar("ConfigT", bound=_NotificationConfigLike)
