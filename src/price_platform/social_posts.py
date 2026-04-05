@@ -105,7 +105,9 @@ def _clean_copy_line(text: str | None, *, max_len: int = 64) -> str | None:
     if not compact:
         return None
 
-    first_sentence = next((part.strip() for part in _SENTENCE_SPLIT_RE.split(compact) if part.strip()), compact)
+    # 最初の文を句読点ごと取り出す（split すると句読点が消えるため search を使う）
+    m = _SENTENCE_SPLIT_RE.search(compact)
+    first_sentence = compact[: m.end()].strip() if m else compact
     if len(first_sentence) <= max_len:
         return first_sentence
     return f"{first_sentence[: max_len - 1].rstrip()}…"
@@ -127,7 +129,7 @@ def _default_trust_lines(ctx: SocialPostContext) -> list[str]:
     if ctx.event_type_value == "all_time_low":
         return ["価格推移を追っている人には判断しやすい更新です。"]
     if ctx.event_type_value == "price_drop":
-        return ["以前の価格と見比べやすい下がり方です。"]
+        return ["以前の価格と比べて目立った値下がりです。"]
     if ctx.event_type_value == "good_used_deal":
         return ["新品との価格差を見ながら判断しやすい動きです。"]
     if ctx.event_type_value == "flea_bargain":
@@ -149,7 +151,7 @@ def _select_trust_line(ctx: SocialPostContext) -> str | None:
 
 def _build_headline(ctx: SocialPostContext) -> str:
     if ctx.event_type_value == "all_time_low":
-        body = "いまかなり見やすい価格です"
+        body = "いまかなり注目の価格です"
     elif ctx.event_type_value == "flea_bargain":
         body = "相場より低めの出物です"
     elif ctx.event_type_value.startswith("period_low_"):
@@ -158,7 +160,7 @@ def _build_headline(ctx: SocialPostContext) -> str:
     elif ctx.event_type_value == "price_drop":
         body = "価格がひと段階下がりました"
     elif ctx.event_type_value == "good_used_deal":
-        body = "中古を探している人には見やすい水準です"
+        body = "中古を探している人には注目の水準です"
     elif ctx.event_type_value == "price_recovery":
         body = "価格が戻り始めています"
     else:
