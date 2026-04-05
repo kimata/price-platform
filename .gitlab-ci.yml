@@ -1,0 +1,86 @@
+image: gitlab.green-rabbit.net:5050/kimata/local-ubuntu:260104_3efe597c
+
+variables:
+    UV_LINK_MODE: copy
+    UV_CACHE_DIR: .uv-cache
+
+    UV_HTTP_TIMEOUT: "60"
+    UV_EXTRA_INDEX_URL: "http://proxy:3141/simple/"
+    UV_INSECURE_HOST: "proxy"
+
+stages:
+    - test
+    - renovate
+
+test-pytest:
+    stage: test
+
+    needs: []
+
+    before_script:
+        - uv sync --frozen --no-editable
+
+    script:
+        - uv run pytest
+
+    cache:
+        - key:
+              files:
+                  - uv.lock
+          fallback_keys:
+              - uv-cache-${CI_PROJECT_ID}
+          paths:
+              - ${UV_CACHE_DIR}
+
+update-cache:
+    stage: renovate
+
+    needs: []
+
+    before_script:
+        - uv sync --frozen --no-editable
+
+    script:
+        - echo "Cache updated"
+
+    cache:
+        - key:
+              files:
+                  - uv.lock
+          fallback_keys:
+              - uv-cache-${CI_PROJECT_ID}
+          paths:
+              - ${UV_CACHE_DIR}
+
+    rules:
+        - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+          when: never
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+
+renovate:
+    stage: renovate
+    dependencies: []
+    resource_group: renovate
+    image:
+        name: gitlab.green-rabbit.net:5050/kimata/local-renovate:260104_3da7b77b
+
+    before_script: []
+
+    variables:
+        RENOVATE_CACHE_DIR: .renovate-cache
+        LOG_LEVEL: info
+
+    script:
+        - renovate --platform gitlab --token ${RENOVATE_TOKEN} --endpoint ${CI_SERVER_URL}/api/v4 ${CI_PROJECT_PATH}
+
+    cache:
+        key: renovate-${CI_PROJECT_ID}
+        paths:
+            - ${RENOVATE_CACHE_DIR}
+
+    rules:
+        - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+          when: never
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+        - changes:
+              - renovate.json
