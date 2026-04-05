@@ -151,18 +151,18 @@ def _select_trust_line(ctx: SocialPostContext) -> str | None:
 
 def _build_headline(ctx: SocialPostContext) -> str:
     if ctx.event_type_value == "all_time_low":
-        body = "いまかなり注目の価格です"
+        body = "いまかなり注目の価格です。"
     elif ctx.event_type_value == "flea_bargain":
-        body = "相場より低めの出物です"
+        body = "相場より低めの出物です。"
     elif ctx.event_type_value.startswith("period_low_"):
         period = ctx.period_days or 30
-        body = f"ここ{period}日でいちばん低い水準です"
+        body = f"ここ{period}日でいちばん低い水準です。"
     elif ctx.event_type_value == "price_drop":
-        body = "価格がひと段階下がりました"
+        body = "価格がひと段階下がりました。"
     elif ctx.event_type_value == "good_used_deal":
-        body = "中古を探している人には注目の水準です"
+        body = "中古を探している人には注目の水準です。"
     elif ctx.event_type_value == "price_recovery":
-        body = "価格が戻り始めています"
+        body = "価格が戻り始めています。"
     else:
         body = ctx.event_type_label
     return f"{ctx.event_emoji} {body}"
