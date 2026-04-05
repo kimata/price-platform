@@ -1,4 +1,4 @@
-"""Application factory scaffolding for price-platform."""
+"""price-platform 向け Flask アプリファクトリ。"""
 
 from __future__ import annotations
 
@@ -10,16 +10,21 @@ import flask_cors
 import werkzeug.middleware.proxy_fix
 
 from ._app_specs import (
-    BlueprintRegistration,
+    BlueprintRegistration,  # noqa: F401 — re-exported via webapp.__init__
     CommonRoutesSettings,
-    OptionalBlueprintRegistration,
+    OptionalBlueprintRegistration,  # noqa: F401 — re-exported via webapp.__init__
     PlatformAppSpec,
-    SeoRoutesSpec,
+    SeoRoutesSpec,  # noqa: F401 — re-exported via webapp.__init__
+    StandardPlatformAppSpec,
     WebAppSettings,
 )
 from ._blueprints import register_blueprints, register_optional_blueprints
-from ._common_routes import finalize_platform_app, install_common_routes, notify_content_update
-from ._seo_routes import install_seo_routes
+from ._common_routes import (
+    finalize_platform_app,
+    install_common_routes,
+    notify_content_update,  # noqa: F401 — re-exported via webapp.__init__
+)
+from ._seo_routes import install_seo_routes  # noqa: F401 — re-exported via webapp.__init__
 from .cors import get_cors_origins
 from .headers import apply_common_headers
 from .request_context import SupportsRequestConnection, install_request_hooks
@@ -114,7 +119,33 @@ def create_configured_platform_app(
     return app
 
 
+def create_standard_platform_spec(spec: StandardPlatformAppSpec) -> PlatformAppSpec:
+    """標準レイアウトのアプリ仕様を共通定義から構築する。"""
+    return PlatformAppSpec(
+        settings=WebAppSettings(
+            app_name=spec.app_name,
+            url_prefix=spec.url_prefix,
+            external_url=spec.external_url,
+            static_dir_path=spec.base_dir / "frontend" / "dist",
+            cache_rules=spec.cache_rules,
+            html_content_security_policy=spec.html_content_security_policy,
+        ),
+        common_routes=CommonRoutesSettings(
+            url_prefix=spec.url_prefix,
+            img_dir=spec.base_dir / "img",
+            flea_thumb_dir=spec.flea_thumb_dir,
+        ),
+        healthcheck=spec.healthcheck,
+        blueprints=spec.blueprints,
+        optional_blueprints=spec.optional_blueprints,
+        route_installers=spec.route_installers,
+        warmup_steps=spec.warmup_steps,
+        warmup=spec.warmup,
+    )
+
+
 def create_warmup(*steps: Callable[[], object]) -> Callable[[], None]:
+    """複数のウォームアップ処理を順番に実行する関数を返す。"""
     def warmup() -> None:
         for step in steps:
             step()

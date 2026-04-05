@@ -1,4 +1,4 @@
-"""Read-side helpers for metrics SQLite storage."""
+"""メトリクス SQLite の読み取り側ヘルパー。"""
 
 from __future__ import annotations
 

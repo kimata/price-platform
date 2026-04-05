@@ -1,4 +1,4 @@
-"""Shared helpers for selection-aware store queries."""
+"""selection 対応ストアクエリの共通ヘルパー。"""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""CORS helpers for price-platform web applications."""
+"""price-platform Web アプリ向けの CORS ヘルパー。"""
 
 from __future__ import annotations
 

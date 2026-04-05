@@ -1,4 +1,4 @@
-"""Shared helpers for notification status endpoints."""
+"""通知状態エンドポイント向けの共通ヘルパー。"""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Cross-app helper builders for consumer applications."""
+"""各アプリ共通で使うランタイム構築ヘルパー。"""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ WebPushStoreT = TypeVar("WebPushStoreT")
 
 @dataclass(frozen=True)
 class StoreRuntimeFactories(Generic[ConfigT, PriceStoreT, PriceEventStoreT]):
-    """Factories for building a typed StoreRuntime."""
+    """型付き `StoreRuntime` を構築するためのファクトリー群。"""
 
     price_store_factory: Callable[[ConfigT], PriceStoreT]
     price_event_store_factory: Callable[[ConfigT], PriceEventStoreT]
@@ -27,7 +27,7 @@ class StoreRuntimeFactories(Generic[ConfigT, PriceStoreT, PriceEventStoreT]):
 
 @dataclass(frozen=True)
 class ServiceFactories(Generic[ConfigT, MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]):
-    """Factories for opening Web API service dependencies."""
+    """Web API が利用する依存サービスを生成するファクトリー群。"""
 
     metrics_db_factory: Callable[[ConfigT], MetricsDbT | None]
     client_metrics_db_factory: Callable[[ConfigT], ClientMetricsDbT | None]
@@ -39,7 +39,7 @@ def build_store_runtime(
     config: ConfigT,
     factories: StoreRuntimeFactories[ConfigT, PriceStoreT, PriceEventStoreT],
 ) -> price_platform.store_runtime.StoreRuntime[PriceStoreT, PriceEventStoreT]:
-    """Build a typed StoreRuntime from store factories."""
+    """ストア系ファクトリーから型付き `StoreRuntime` を組み立てる。"""
     return price_platform.store_runtime.build_store_runtime(
         config,
         price_store_factory=factories.price_store_factory,
@@ -51,7 +51,7 @@ def build_app_services(
     config: ConfigT,
     factories: ServiceFactories[ConfigT, MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT],
 ) -> price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]:
-    """Build an AppServices bundle from service factories."""
+    """サービスファクトリーから `AppServices` を構築する。"""
     return price_platform.webapp.build_app_services(
         metrics_db_factory=lambda: factories.metrics_db_factory(config),
         client_metrics_db_factory=lambda: factories.client_metrics_db_factory(config),

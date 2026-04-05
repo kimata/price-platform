@@ -1,4 +1,4 @@
-"""Shared WebDriver pool primitives for scrape engines."""
+"""スクレイプ処理向け WebDriver プールの共通基盤。"""
 
 from __future__ import annotations
 

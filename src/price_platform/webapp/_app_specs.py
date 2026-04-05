@@ -1,10 +1,10 @@
-"""Declarative configuration objects for shared Flask apps."""
+"""共有 Flask アプリ用の宣言的な設定オブジェクト。"""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 import flask
 
@@ -50,6 +50,23 @@ class PlatformAppSpec:
     settings: WebAppSettings
     common_routes: CommonRoutesSettings
     healthcheck: Callable[[], object]
+    blueprints: tuple[BlueprintRegistration, ...] = field(default_factory=tuple)
+    optional_blueprints: tuple[OptionalBlueprintRegistration, ...] = field(default_factory=tuple)
+    route_installers: tuple[Callable[[flask.Flask], None], ...] = field(default_factory=tuple)
+    warmup_steps: tuple[Callable[[], object], ...] = field(default_factory=tuple)
+    warmup: Callable[[], None] | None = None
+
+
+@dataclass(frozen=True)
+class StandardPlatformAppSpec:
+    app_name: str
+    url_prefix: str
+    external_url: str
+    base_dir: Path
+    flea_thumb_dir: Path
+    healthcheck: Callable[[], object]
+    cache_rules: tuple[CacheRule, ...] = field(default_factory=tuple)
+    html_content_security_policy: str | None = None
     blueprints: tuple[BlueprintRegistration, ...] = field(default_factory=tuple)
     optional_blueprints: tuple[OptionalBlueprintRegistration, ...] = field(default_factory=tuple)
     route_installers: tuple[Callable[[flask.Flask], None], ...] = field(default_factory=tuple)

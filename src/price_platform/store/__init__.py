@@ -1,4 +1,4 @@
-"""Shared store-layer helpers with lazy re-exports."""
+"""ストア層の共通ヘルパーと遅延 re-export。"""
 
 from __future__ import annotations
 

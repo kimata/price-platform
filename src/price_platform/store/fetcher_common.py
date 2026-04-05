@@ -1,4 +1,4 @@
-"""Shared primitives for product-store fetchers."""
+"""商品別取得クラスで共有する基底機能。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import time
 import unicodedata
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeVar
 
 import requests
 from bs4 import BeautifulSoup
@@ -36,7 +36,7 @@ class _SeleniumConfigLike(Protocol):
 
 
 class FetcherConfigProtocol(Protocol):
-    """Minimal config surface required by SharedBaseFetcher."""
+    """`SharedBaseFetcher` が必要とする最小限の設定インターフェース。"""
 
     @property
     def selenium(self) -> _SeleniumConfigLike: ...
@@ -59,9 +59,18 @@ class ColorLabelFilterConfig:
     color_family_keywords: dict[str, tuple[str, ...]]
 
 
+@dataclass(frozen=True)
+class FetcherProfile:
+    """取得処理の共通プロファイル。"""
+
+    product_name_filter: ProductNameFilterConfig
+    color_label_filter: ColorLabelFilterConfig
+    webdriver_profile_name: str
+
+
 @dataclass
 class ReferencePrices:
-    """Reference-price container with source priority."""
+    """参照価格を優先順位つきで保持するコンテナ。"""
 
     yodobashi: dict[str, int] = field(default_factory=dict)
     yahoo: dict[str, int] = field(default_factory=dict)
@@ -106,7 +115,7 @@ def filter_by_product_name_match(
     exclude_product_names: list[str] | None = None,
     config: ProductNameFilterConfig,
 ) -> list[ScrapedPriceT]:
-    """Filter listings whose title does not match the target product name."""
+    """対象製品名に合わない出品を除外する。"""
     keywords = product_name.split()
     if not keywords:
         return prices
@@ -161,10 +170,10 @@ def filter_by_product_name_match(
         if (
             config.parts_ng_words
             and config.parts_ng_price_threshold is not None
-            and getattr(price, "price") < config.parts_ng_price_threshold
+            and price.price < config.parts_ng_price_threshold
+            and any(ng in title_normalized for ng in config.parts_ng_words)
         ):
-            if any(ng in title_normalized for ng in config.parts_ng_words):
-                continue
+            continue
 
         filtered.append(price)
 
@@ -184,7 +193,7 @@ def exclude_suspicious_prices(
     filtered: list[ScrapedPriceT] = []
 
     for price in prices:
-        if getattr(price, "price") < threshold_min or getattr(price, "price") > threshold_max:
+        if price.price < threshold_min or price.price > threshold_max:
             continue
         filtered.append(price)
 
@@ -225,8 +234,48 @@ def filter_by_color_label(
     return filtered
 
 
+def filter_by_product_name_profile(
+    prices: list[ScrapedPriceT],
+    product_name: str,
+    store_name: str,
+    *,
+    profile: FetcherProfile,
+    exclude_product_names: list[str] | None = None,
+) -> list[ScrapedPriceT]:
+    """プロファイル定義を使って製品名フィルタを適用する。"""
+    return filter_by_product_name_match(
+        prices,
+        product_name,
+        store_name,
+        exclude_product_names=exclude_product_names,
+        config=profile.product_name_filter,
+    )
+
+
+def filter_by_color_label_profile(
+    prices: list[ScrapedPriceT],
+    color_label: str,
+    color_family: str,
+    product_name: str,
+    *,
+    profile: FetcherProfile,
+    store_name: str = "フリマ",
+    has_multiple_black_variants: bool = False,
+) -> list[ScrapedPriceT]:
+    """プロファイル定義を使って色ラベルフィルタを適用する。"""
+    return filter_by_color_label(
+        prices,
+        color_label,
+        color_family,
+        product_name,
+        filter_config=profile.color_label_filter,
+        store_name=store_name,
+        has_multiple_black_variants=has_multiple_black_variants,
+    )
+
+
 class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT, StoreT]):
-    """Shared HTTP/WebDriver fetcher base."""
+    """HTTP / WebDriver を併用する取得基底クラス。"""
 
     store_type: StoreT
     MAX_SEARCH_RESULTS = 20
@@ -289,6 +338,7 @@ class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT, StoreT]):
     @contextlib.contextmanager
     def get_webdriver(self) -> Generator[tuple[WebDriver, WebDriverWait], None, None]:
         import selenium.webdriver.support.wait
+
         from price_platform.platform import browser
 
         data_path = pathlib.Path(self.config.selenium.data_path)
@@ -305,7 +355,7 @@ class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT, StoreT]):
 
     @abstractmethod
     def scrape(self, product: ProductT) -> list[ScrapedPriceT]:
-        """Scrape prices for a product."""
+        """商品ごとの価格情報を取得する。"""
 
     def scrape_with_webdriver(
         self,
@@ -330,7 +380,19 @@ class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT, StoreT]):
         for product in products:
             try:
                 prices = self.scrape(product)
-                results[getattr(product, "name")] = prices
+                results[product.name] = prices
             except (requests.RequestException, OSError, ValueError):
-                results[getattr(product, "name")] = []
+                results[product.name] = []
         return results
+
+
+class ProfiledSharedBaseFetcher(SharedBaseFetcher[ProductT, ScrapedPriceT, ConfigT, StoreT]):
+    """取得プロファイルを静的属性として持つ共通取得基底クラス。"""
+
+    FETCHER_PROFILE: ClassVar[FetcherProfile]
+
+    def __init__(self, config: ConfigT) -> None:
+        super().__init__(
+            config,
+            webdriver_profile_name=self.FETCHER_PROFILE.webdriver_profile_name,
+        )

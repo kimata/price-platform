@@ -1,4 +1,4 @@
-"""Profile-based shared app config helpers."""
+"""プロファイルベースの共有設定ヘルパー。"""
 
 from __future__ import annotations
 

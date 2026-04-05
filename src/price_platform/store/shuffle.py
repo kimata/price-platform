@@ -1,4 +1,4 @@
-"""Product shuffle utilities for scrape engines."""
+"""スクレイプエンジン向けの商品シャッフルユーティリティ。"""
 
 from __future__ import annotations
 

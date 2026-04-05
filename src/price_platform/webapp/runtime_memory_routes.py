@@ -1,4 +1,4 @@
-"""Route helpers for runtime memory metrics."""
+"""実行時メモリメトリクス用ルートヘルパー。"""
 
 from __future__ import annotations
 

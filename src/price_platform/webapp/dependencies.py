@@ -1,9 +1,10 @@
-"""Helpers for attaching typed dependency containers to Flask apps."""
+"""型付き依存コンテナを Flask アプリへ接続するヘルパー。"""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Generic, TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 import flask
 
@@ -44,7 +45,9 @@ def _resolve_service(
     return cast(ServiceT | None, cache[name])
 
 
-def _validate_service_source(name: str, service: object | None, factory: Callable[[], object | None] | None) -> None:
+def _validate_service_source(
+    name: str, service: object | None, factory: Callable[[], object | None] | None
+) -> None:
     if service is not None and factory is not None:
         raise ValueError(f"{name} and {name}_factory cannot both be provided")
 
@@ -96,6 +99,15 @@ class AppDependencies(Generic[ConfigT, StoresT, ServicesT]):
     services: ServicesT
 
 
+@dataclass(frozen=True)
+class WebApiDependencySpec(Generic[ConfigT, StoresT, ServicesT]):
+    """Web API 依存構成を宣言的に表す spec。"""
+
+    extension_key: str
+    store_builder: Callable[[ConfigT], StoresT]
+    service_builder: Callable[[ConfigT], ServicesT]
+
+
 def build_app_services(
     *,
     metrics_db: MetricsDbT | None = None,
@@ -134,10 +146,31 @@ def build_app_dependencies(
     return AppDependencies(config=config, stores=stores, services=services)
 
 
+def build_webapi_dependencies(
+    config: ConfigT,
+    spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT],
+) -> AppDependencies[ConfigT, StoresT, ServicesT]:
+    """spec に基づいて Web API 用依存コンテナを構築する。"""
+    return build_app_dependencies(
+        config=config,
+        stores=spec.store_builder(config),
+        services=spec.service_builder(config),
+    )
+
+
 def install_dependencies(app: flask.Flask, extension_key: str, dependencies: DependenciesT) -> DependenciesT:
     """Attach a dependency container to ``app.extensions``."""
     app.extensions[extension_key] = dependencies
     return dependencies
+
+
+def install_webapi_dependencies(
+    app: flask.Flask,
+    spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT],
+    dependencies: AppDependencies[ConfigT, StoresT, ServicesT],
+) -> AppDependencies[ConfigT, StoresT, ServicesT]:
+    """Web API 用依存コンテナを app.extensions へ登録する。"""
+    return install_dependencies(app, spec.extension_key, dependencies)
 
 
 def get_dependencies(extension_key: str) -> object:
@@ -151,3 +184,20 @@ def get_dependencies(extension_key: str) -> object:
 def get_typed_dependencies(extension_key: str, dependencies_type: type[DependenciesT]) -> DependenciesT:
     """Return a typed dependency container."""
     return cast(DependenciesT, get_dependencies(extension_key))
+
+
+def get_webapi_dependencies(
+    spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT],
+) -> AppDependencies[ConfigT, StoresT, ServicesT]:
+    """spec に対応する Web API 依存コンテナを返す。"""
+    return get_typed_dependencies(spec.extension_key, AppDependencies)
+
+
+def get_webapi_config(spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT]) -> ConfigT:
+    """spec に対応するアプリ設定を返す。"""
+    return get_webapi_dependencies(spec).config
+
+
+def get_webapi_services(spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT]) -> ServicesT:
+    """spec に対応するサービス束を返す。"""
+    return get_webapi_dependencies(spec).services

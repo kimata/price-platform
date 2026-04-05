@@ -1,4 +1,4 @@
-"""Configuration models for price-platform applications."""
+"""price-platform アプリ向け設定モデル。"""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def _resolve_path(value: str | Path, *, base_dir: Path) -> Path:
 
 @dataclass(frozen=True)
 class AmazonStoreConfig:
-    """Amazon API credentials."""
+    """Amazon API 認証情報。"""
 
     credential_id: str
     credential_secret: str
@@ -35,7 +35,7 @@ class AmazonStoreConfig:
 
 @dataclass(frozen=True)
 class RakutenStoreConfig:
-    """Rakuten API credentials."""
+    """楽天 API 認証情報。"""
 
     application_id: str
     affiliate_id: str | None = None
@@ -50,7 +50,7 @@ class RakutenStoreConfig:
 
 @dataclass(frozen=True)
 class YahooStoreConfig:
-    """Yahoo Shopping API credentials."""
+    """Yahoo ショッピング API 認証情報。"""
 
     client_id: str
     secret: str
@@ -69,7 +69,7 @@ class YahooStoreConfig:
 
 @dataclass(frozen=True)
 class MercariConfig:
-    """Mercari affiliate configuration."""
+    """メルカリアフィリエイト設定。"""
 
     affiliate_id: str = ""
 
@@ -82,7 +82,7 @@ class MercariConfig:
 
 @dataclass(frozen=True)
 class StoreConfig:
-    """Store API credentials used by price applications."""
+    """価格アプリが利用するストア API 設定。"""
 
     amazon: AmazonStoreConfig
     yahoo: YahooStoreConfig
@@ -101,7 +101,7 @@ class StoreConfig:
 
 @dataclass(frozen=True)
 class ScrapeConfig:
-    """Scraping configuration."""
+    """スクレイピング設定。"""
 
     stores: tuple[str, ...] = field(default_factory=tuple)
     max_items: int = 20

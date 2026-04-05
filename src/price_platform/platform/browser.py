@@ -1,4 +1,4 @@
-"""Adapters for browser-related helpers."""
+"""ブラウザ関連ヘルパーの薄い集約層。"""
 
 from __future__ import annotations
 
@@ -7,9 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from selenium.webdriver.remote.webdriver import WebDriver
-    import my_lib.platform.browser
-
-    BrowserManager = my_lib.platform.browser.BrowserManager
+    from my_lib.browser_manager import BrowserManager
 else:
     BrowserManager = object
 
@@ -21,9 +19,9 @@ def create_browser_manager(
     clear_profile_on_error: bool = True,
     max_retry_on_error: int = 2,
 ) -> BrowserManager:
-    import my_lib.platform.browser
+    from my_lib.browser_manager import BrowserManager as BrowserManagerImpl
 
-    return my_lib.platform.browser.BrowserManager(
+    return BrowserManagerImpl(
         profile_name=profile_name,
         data_dir=data_dir,
         clear_profile_on_error=clear_profile_on_error,
@@ -32,9 +30,9 @@ def create_browser_manager(
 
 
 def create_driver(*, profile_name: str, data_path: Path, is_headless: bool) -> WebDriver:
-    import my_lib.platform.browser
+    from my_lib.selenium_util import create_driver as create_driver_impl
 
-    return my_lib.platform.browser.create_driver(
+    return create_driver_impl(
         profile_name=profile_name,
         data_path=data_path,
         is_headless=is_headless,
@@ -42,12 +40,12 @@ def create_driver(*, profile_name: str, data_path: Path, is_headless: bool) -> W
 
 
 def quit_driver_gracefully(driver: WebDriver) -> None:
-    import my_lib.platform.browser
+    from my_lib.selenium_util import quit_driver_gracefully as quit_driver_gracefully_impl
 
-    my_lib.platform.browser.quit_driver_gracefully(driver)
+    quit_driver_gracefully_impl(driver)
 
 
 def clear_cache(driver: WebDriver) -> None:
-    import my_lib.platform.browser
+    from my_lib.selenium_util import clear_cache as clear_cache_impl
 
-    my_lib.platform.browser.clear_cache(driver)
+    clear_cache_impl(driver)

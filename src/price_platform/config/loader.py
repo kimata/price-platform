@@ -1,4 +1,4 @@
-"""Configuration loading helpers for price-platform applications."""
+"""price-platform アプリ向け設定ロードヘルパー。"""
 
 from __future__ import annotations
 
@@ -45,14 +45,14 @@ OPTIONAL_SECTIONS = ("notification", "client_metrics")
 
 @dataclass(frozen=True)
 class AppConfigSpec:
-    """Application-specific knobs for loading shared config."""
+    """共有設定を読む際のアプリ固有パラメータ。"""
 
     env_var_name: str
     default_liveness_file: Path
 
 
 def warn_unknown_keys(data: dict[str, Any], known_keys: set[str], section_name: str) -> None:
-    """Warn about unknown keys in config data."""
+    """設定内の未知キーを警告する。"""
     unknown = set(data.keys()) - known_keys
     for key in sorted(unknown):
         candidates = difflib.get_close_matches(key, known_keys, n=1, cutoff=0.6)
@@ -67,7 +67,7 @@ def load_app_config(
     default_liveness_file: Path,
     config_path: str | Path | None = None,
 ) -> ConfigT:
-    """Load shared app config from YAML."""
+    """YAML から共有アプリ設定を読み込む。"""
     return load_app_config_for(
         config_cls,
         AppConfigSpec(
@@ -84,7 +84,7 @@ def load_app_config_for(
     *,
     config_path: str | Path | None = None,
 ) -> ConfigT:
-    """Load shared app config using an application-specific spec."""
+    """アプリ固有 spec を使って共有設定を読み込む。"""
     if config_path is None:
         config_path = os.environ.get(spec.env_var_name, "config.yaml")
 
@@ -114,7 +114,7 @@ def parse_app_config(
     default_liveness_file: Path,
     base_dir: Path | None = None,
 ) -> ConfigT:
-    """Build shared app config from dict."""
+    """辞書データから共有アプリ設定を構築する。"""
     return parse_app_config_for(
         config_cls,
         AppConfigSpec(
@@ -133,7 +133,7 @@ def parse_app_config_for(
     *,
     base_dir: Path | None = None,
 ) -> ConfigT:
-    """Build shared app config from dict using an application-specific spec."""
+    """アプリ固有 spec を使って辞書から共有設定を構築する。"""
     for section in REQUIRED_SECTIONS:
         if section not in data:
             msg = f"{section} configuration is required"

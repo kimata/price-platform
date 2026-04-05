@@ -1,4 +1,4 @@
-"""Boxplot and realtime query helpers for client metrics."""
+"""クライアントメトリクス向け箱ひげ図・リアルタイム集計ヘルパー。"""
 
 from __future__ import annotations
 

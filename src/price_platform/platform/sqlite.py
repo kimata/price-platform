@@ -1,4 +1,4 @@
-"""Thin SQLite facade over my_lib."""
+"""SQLite ヘルパーの薄い集約層。"""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ from pathlib import Path
 import sqlite3
 from typing import Literal
 
-import my_lib.platform.sqlite
+import my_lib.sqlite_util
 
 LockingMode = Literal["NORMAL", "EXCLUSIVE"]
-DatabaseConnection = my_lib.platform.sqlite.DatabaseConnection
+DatabaseConnection = my_lib.sqlite_util.DatabaseConnection
 
 
 def connect(
@@ -18,7 +18,7 @@ def connect(
     timeout: float = 60.0,
     locking_mode: LockingMode | None = None,
 ) -> DatabaseConnection:
-    return my_lib.platform.sqlite.connect(db_path, timeout=timeout, locking_mode=locking_mode)
+    return my_lib.sqlite_util.connect(db_path, timeout=timeout, locking_mode=locking_mode)
 
 
 def init_schema_from_file(
@@ -28,7 +28,7 @@ def init_schema_from_file(
     timeout: float = 60.0,
     locking_mode: LockingMode | None = None,
 ) -> None:
-    my_lib.platform.sqlite.init_schema_from_file(
+    my_lib.sqlite_util.init_schema_from_file(
         db_path,
         schema_path,
         timeout=timeout,
@@ -37,8 +37,8 @@ def init_schema_from_file(
 
 
 def recover(db_path: str | Path) -> None:
-    my_lib.platform.sqlite.recover(db_path)
+    my_lib.sqlite_util.recover(db_path)
 
 
 def exec_schema_from_file(conn: sqlite3.Connection, schema_path: str | Path) -> None:
-    my_lib.platform.sqlite.exec_schema_from_file(conn, schema_path)
+    my_lib.sqlite_util.exec_schema_from_file(conn, schema_path)

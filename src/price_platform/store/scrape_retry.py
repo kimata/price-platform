@@ -1,4 +1,4 @@
-"""Shared retry helpers for scrape-engine operations."""
+"""スクレイプ処理向けの共通リトライヘルパー。"""
 
 from __future__ import annotations
 

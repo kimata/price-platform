@@ -1,4 +1,4 @@
-"""Core Web Vitals read/write helpers for client metrics."""
+"""クライアントメトリクス向け Core Web Vitals 読み書きヘルパー。"""
 
 from __future__ import annotations
 

@@ -1,1 +1,1 @@
-"""Shared platform components for product price applications."""
+"""価格追跡アプリ向けの共通基盤コンポーネント。"""

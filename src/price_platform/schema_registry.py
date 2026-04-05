@@ -1,4 +1,4 @@
-"""Schema path resolution for bundled SQLite schemas."""
+"""同梱 SQLite スキーマのパス解決ヘルパー。"""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Shared SQLite base for price-event stores."""
+"""価格イベントストア向けの共通 SQLite 基底。"""
 
 from __future__ import annotations
 

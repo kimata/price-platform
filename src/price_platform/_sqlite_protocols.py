@@ -1,23 +1,29 @@
-"""Shared protocols for SQLite-backed mixins."""
+"""SQLite ベースの mixin が参照する共通 Protocol 定義。"""
 
 from __future__ import annotations
 
+import sqlite3
 from contextlib import AbstractContextManager
 from typing import Protocol
-import sqlite3
 
-from ._client_metrics_sqlite_models import BoxplotData, ClientPerfRaw, DeviceType, MetricName, WebVitalBoxplotData, WebVitalName
+from ._client_metrics_sqlite_models import (
+    BoxplotData,
+    DeviceType,
+    MetricName,
+    WebVitalBoxplotData,
+    WebVitalName,
+)
 from ._metrics_sqlite_models import AmazonBatchStats, CrawlSession, ItemCrawlStats
 
 
 class SQLiteConnectionProvider(Protocol):
-    """Provide SQLite connections to mixins."""
+    """mixin へ SQLite 接続を供給するインターフェース。"""
 
     def _get_connection(self) -> AbstractContextManager[sqlite3.Connection]: ...
 
 
 class ClientMetricsAggregateProvider(SQLiteConnectionProvider, Protocol):
-    """Connection plus daily aggregation state for client metrics."""
+    """クライアントメトリクスの日次集計に必要な状態を持つインターフェース。"""
 
     _last_aggregated_date: str | None
 
@@ -25,7 +31,7 @@ class ClientMetricsAggregateProvider(SQLiteConnectionProvider, Protocol):
 
 
 class ClientMetricsBoxplotProvider(SQLiteConnectionProvider, Protocol):
-    """Surface required by client metric boxplot helpers."""
+    """クライアントメトリクスの箱ひげ図集計で必要なインターフェース。"""
 
     def _compute_stats_for_date(
         self,
@@ -37,7 +43,7 @@ class ClientMetricsBoxplotProvider(SQLiteConnectionProvider, Protocol):
 
 
 class ClientMetricsWebVitalsProvider(SQLiteConnectionProvider, Protocol):
-    """Surface required by web vitals query helpers."""
+    """Web Vitals 集計で必要なインターフェース。"""
 
     def _compute_web_vital_stats_for_date(
         self,
@@ -49,7 +55,7 @@ class ClientMetricsWebVitalsProvider(SQLiteConnectionProvider, Protocol):
 
 
 class MetricsRowMapper(SQLiteConnectionProvider, Protocol):
-    """Connection plus row mapping for metrics readers."""
+    """メトリクス読み取り時の行変換を備えたインターフェース。"""
 
     def _row_to_session(self, row: sqlite3.Row) -> CrawlSession: ...
 

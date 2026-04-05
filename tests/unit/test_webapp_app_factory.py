@@ -135,6 +135,23 @@ def test_create_warmup_runs_all_steps() -> None:
     assert steps == ["catalog", "store", "guide"]
 
 
+def test_create_standard_platform_spec_builds_common_paths() -> None:
+    spec = price_platform.webapp.create_standard_platform_spec(
+        price_platform.webapp.StandardPlatformAppSpec(
+            app_name="test-app",
+            url_prefix="/test",
+            external_url="https://example.com",
+            base_dir=Path("/srv/app"),
+            flea_thumb_dir=Path("/srv/cache/thumb"),
+            healthcheck=lambda: None,
+        )
+    )
+
+    assert spec.settings.static_dir_path == Path("/srv/app/frontend/dist")
+    assert spec.common_routes.img_dir == Path("/srv/app/img")
+    assert spec.common_routes.flea_thumb_dir == Path("/srv/cache/thumb")
+
+
 def test_create_configured_platform_app_runs_warmup_steps_without_explicit_callback() -> None:
     steps: list[str] = []
 
