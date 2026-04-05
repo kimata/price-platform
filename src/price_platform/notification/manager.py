@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any, Generic, Protocol, TypeVar
 
 from price_platform.config import TwitterConfig
+from price_platform.social_posts import SocialCopyMetadata, SocialPostContext, compose_social_post
 
-from .webpush_sender import WebPushResult
+from .webpush_sender import WebPushResult, build_detail_url
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +50,21 @@ class WebPushSenderProtocol(Protocol[EventT, ProductT]):
 
 
 @dataclass(frozen=True)
+class NotificationStrategies(Generic[EventT, ProductT]):
+    """通知文面生成に使う差し替え戦略群。"""
+
+    selection_key_resolver: Callable[[EventT, ProductT | None], str | None]
+    product_line_builder: Callable[[ProductT, EventT], str]
+    social_copy_builder: Callable[[ProductT], SocialCopyMetadata]
+
+
+@dataclass(frozen=True)
 class NotificationPresentation(Generic[EventT, ProductT, CatalogT]):
     """通知文面生成に必要なアプリ差分をまとめた定義。"""
 
     resolve_product: Callable[[CatalogT, str], ProductT | None]
     product_name_getter: Callable[[ProductT], str]
-    social_message_builder: Callable[[EventT, ProductT, str], str]
+    strategies: NotificationStrategies[EventT, ProductT]
 
 
 @dataclass(frozen=True)
@@ -77,6 +87,57 @@ def build_twitter_config(config: Any) -> TwitterConfig:
         access_token_secret=config.access_token_secret,
         post_interval_sec=config.post_interval_sec,
     )
+
+
+def build_notification_runtime(
+    *,
+    open_notification_store: Callable[[Path], NotificationStoreT],
+    create_twitter_poster: Callable[[TwitterConfig, NotificationStoreT], TwitterPosterT],
+    open_webpush_store: Callable[[Path], WebPushStoreT],
+    webpush_sender_type: type[WebPushSenderT],
+) -> NotificationRuntime[NotificationStoreT, TwitterPosterT, WebPushStoreT, WebPushSenderT]:
+    """通知 runtime を標準形で構築する。"""
+    return NotificationRuntime(
+        open_notification_store=open_notification_store,
+        create_twitter_poster=create_twitter_poster,
+        open_webpush_store=open_webpush_store,
+        create_webpush_sender=lambda config, store, external_url: webpush_sender_type(
+            config=config,
+            store=store,
+            external_url=external_url,
+        ),
+    )
+
+
+def build_social_message(
+    event: EventT,
+    product: ProductT,
+    external_url: str,
+    strategies: NotificationStrategies[EventT, ProductT],
+) -> str:
+    """戦略群を使って SNS 投稿文面を組み立てる。"""
+    selection_key = strategies.selection_key_resolver(event, product)
+    detail_url = build_detail_url(external_url, getattr(event, "product_id"), selection_key)
+    post = compose_social_post(
+        SocialPostContext(
+            product_id=getattr(event, "product_id"),
+            product_line=strategies.product_line_builder(product, event),
+            detail_url=detail_url,
+            event_type_value=getattr(getattr(event, "event_type"), "value"),
+            event_type_label=getattr(getattr(event, "event_type"), "label"),
+            event_emoji=getattr(getattr(event, "event_type"), "emoji"),
+            store_label=getattr(getattr(event, "store"), "label"),
+            price=getattr(event, "price"),
+            previous_price=getattr(event, "previous_price"),
+            reference_price=getattr(event, "reference_price"),
+            change_percent=getattr(event, "change_percent"),
+            period_days=getattr(event, "period_days"),
+            recorded_at=getattr(event, "recorded_at"),
+            hashtag=getattr(product, "hashtag"),
+            social_copy=strategies.social_copy_builder(product),
+        )
+    )
+    return post.message
 
 
 @dataclass
@@ -166,10 +227,11 @@ class BaseNotificationManager(
         message = f"{event.event_type.emoji} {event.format_message(display_name)}"
 
         if product is not None and self.config.webapp.external_url:
-            message = self.presentation.social_message_builder(
+            message = build_social_message(
                 event,
                 product,
                 self.config.webapp.external_url,
+                self.presentation.strategies,
             )
 
         self._store.enqueue(event, message)

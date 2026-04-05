@@ -9,6 +9,9 @@ from .manager import (
     BaseNotificationManager,
     NotificationPresentation,
     NotificationRuntime,
+    NotificationStrategies,
+    build_notification_runtime,
+    build_social_message,
     build_twitter_config,
 )
 from .notification_store import (
@@ -37,6 +40,7 @@ __all__ = [
     "NotificationItem",
     "NotificationPresentation",
     "NotificationRuntime",
+    "NotificationStrategies",
     "NotificationStatus",
     "NotificationStore",
     "RateLimitState",
@@ -46,6 +50,8 @@ __all__ = [
     "WebPushResult",
     "WebPushSubscriptionRecord",
     "build_detail_url",
+    "build_notification_runtime",
+    "build_social_message",
     "build_twitter_config",
     "get_notification_store",
     "init_notification_store",

@@ -59,6 +59,23 @@ class ColorLabelFilterConfig:
     color_family_keywords: dict[str, tuple[str, ...]]
 
 
+class ProductNameMatchingPolicy(Protocol):
+    """製品名一致判定の差し替えポリシー。"""
+
+    def expand_keywords(self, product_name: str) -> list[str]: ...
+
+    def keyword_in_title(self, keyword: str, title_upper: str) -> bool: ...
+
+    def should_exclude_title(
+        self,
+        *,
+        title: str,
+        title_upper: str,
+        title_normalized: str,
+        config: ProductNameFilterConfig,
+    ) -> bool: ...
+
+
 @dataclass(frozen=True)
 class FetcherProfile:
     """取得処理の共通プロファイル。"""
@@ -66,6 +83,7 @@ class FetcherProfile:
     product_name_filter: ProductNameFilterConfig
     color_label_filter: ColorLabelFilterConfig
     webdriver_profile_name: str
+    matching_policy: ProductNameMatchingPolicy
 
 
 @dataclass
@@ -84,6 +102,40 @@ class ReferencePrices:
         if product_name in self.amazon:
             return self.amazon[product_name]
         return None
+
+
+class DefaultProductNameMatchingPolicy:
+    """標準的な製品名一致判定ポリシー。"""
+
+    def expand_keywords(self, product_name: str) -> list[str]:
+        return product_name.split()
+
+    def keyword_in_title(self, keyword: str, title_upper: str) -> bool:
+        return _keyword_in_title(keyword, title_upper)
+
+    def should_exclude_title(
+        self,
+        *,
+        title: str,
+        title_upper: str,
+        title_normalized: str,
+        config: ProductNameFilterConfig,
+    ) -> bool:
+        _ = title_upper
+        if "用" in title and "専用" not in title:
+            return True
+        if "空箱" in title:
+            return True
+        if any(ng in title_normalized for ng in config.flea_market_ng_words):
+            return True
+        if any(ng in title for ng in config.condition_ng_words):
+            return True
+        if config.partial_item_ng_words and any(ng in title for ng in config.partial_item_ng_words):
+            return True
+        return False
+
+
+DEFAULT_PRODUCT_NAME_MATCHING_POLICY = DefaultProductNameMatchingPolicy()
 
 
 def _keyword_in_title(keyword: str, title_upper: str) -> bool:
@@ -114,9 +166,10 @@ def filter_by_product_name_match(
     *,
     exclude_product_names: list[str] | None = None,
     config: ProductNameFilterConfig,
+    matching_policy: ProductNameMatchingPolicy = DEFAULT_PRODUCT_NAME_MATCHING_POLICY,
 ) -> list[ScrapedPriceT]:
     """対象製品名に合わない出品を除外する。"""
-    keywords = product_name.split()
+    keywords = matching_policy.expand_keywords(product_name)
     if not keywords:
         return prices
 
@@ -126,10 +179,12 @@ def filter_by_product_name_match(
     for price in prices:
         title = getattr(price, "title", "") or ""
         title_upper = title.upper()
+        title_normalized = unicodedata.normalize("NFKC", title).upper()
 
         matched_exclude = None
         for exclude_name in exclude_names:
-            if _title_matches_product(title_upper, exclude_name):
+            exclude_keywords = matching_policy.expand_keywords(exclude_name)
+            if all(matching_policy.keyword_in_title(kw, title_upper) for kw in exclude_keywords):
                 matched_exclude = exclude_name
                 break
 
@@ -143,7 +198,7 @@ def filter_by_product_name_match(
             )
             continue
 
-        missing_keywords = [kw for kw in keywords if not _keyword_in_title(kw, title_upper)]
+        missing_keywords = [kw for kw in keywords if not matching_policy.keyword_in_title(kw, title_upper)]
         if missing_keywords:
             logger.debug(
                 "%s: %s - タイトル不一致で除外 「%s」（不足: %s）",
@@ -154,17 +209,12 @@ def filter_by_product_name_match(
             )
             continue
 
-        if "用" in title and "専用" not in title:
-            continue
-        if "空箱" in title:
-            continue
-
-        title_normalized = unicodedata.normalize("NFKC", title).upper()
-        if any(ng in title_normalized for ng in config.flea_market_ng_words):
-            continue
-        if any(ng in title for ng in config.condition_ng_words):
-            continue
-        if config.partial_item_ng_words and any(ng in title for ng in config.partial_item_ng_words):
+        if matching_policy.should_exclude_title(
+            title=title,
+            title_upper=title_upper,
+            title_normalized=title_normalized,
+            config=config,
+        ):
             continue
 
         if (
@@ -249,6 +299,7 @@ def filter_by_product_name_profile(
         store_name,
         exclude_product_names=exclude_product_names,
         config=profile.product_name_filter,
+        matching_policy=profile.matching_policy,
     )
 
 
