@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import time
+import unittest.mock
 from dataclasses import dataclass
 
 import pytest
 import selenium.common.exceptions
 
+import price_platform.store.scrape_retry
 from price_platform.store.scrape_retry import run_scrape_with_retry
 
 
@@ -46,7 +49,10 @@ def test_run_scrape_with_retry_retries_timeout_and_succeeds(monkeypatch: pytest.
         nonlocal successes
         successes += 1
 
-    monkeypatch.setattr("price_platform.store.scrape_retry.time.sleep", lambda _: None)
+    monkeypatch.setattr(
+        "price_platform.store.scrape_retry.time.sleep",
+        unittest.mock.create_autospec(time.sleep),
+    )
 
     outcome = run_scrape_with_retry(
         execute=execute,
@@ -78,7 +84,10 @@ def test_run_scrape_with_retry_reports_failure(monkeypatch: pytest.MonkeyPatch) 
         nonlocal timeouts
         timeouts += 1
 
-    monkeypatch.setattr("price_platform.store.scrape_retry.time.sleep", lambda _: None)
+    monkeypatch.setattr(
+        "price_platform.store.scrape_retry.time.sleep",
+        unittest.mock.create_autospec(time.sleep),
+    )
 
     outcome = run_scrape_with_retry(
         execute=execute,
@@ -96,3 +105,8 @@ def test_run_scrape_with_retry_reports_failure(monkeypatch: pytest.MonkeyPatch) 
     assert timeouts == 2
     assert item_timing.success_count == 0
     assert item_timing.failure_messages == ["Message: slow\n"]
+
+
+def _check_protocol_conformance() -> None:
+    """型チェッカーが Protocol 適合性を検証する."""
+    _: price_platform.store.scrape_retry.ItemTimingProtocol = DummyItemTiming()

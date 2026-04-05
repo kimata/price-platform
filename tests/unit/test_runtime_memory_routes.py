@@ -6,6 +6,7 @@ import flask
 
 import price_platform.managers
 import price_platform.webapp
+import price_platform.webapp.runtime_memory_routes
 
 
 class _TrackerStub:
@@ -50,3 +51,8 @@ def test_install_runtime_memory_routes_serves_json_and_svg() -> None:
     assert graph.headers["Content-Type"].startswith("image/svg+xml")
     assert "Pod total" in graph.get_data(as_text=True)
     assert "Selenium" in graph.get_data(as_text=True)
+
+
+def _check_protocol_conformance() -> None:
+    """型チェッカーが Protocol 適合性を検証する."""
+    _: price_platform.webapp.runtime_memory_routes.SupportsMemorySnapshot = _TrackerStub()

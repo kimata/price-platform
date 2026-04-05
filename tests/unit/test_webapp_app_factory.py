@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import contextlib
+import unittest.mock
 from pathlib import Path
 
 import flask
 
 import price_platform.webapp
+import price_platform.webapp.request_context
 
 
 class _ConnectionStub:
@@ -186,8 +188,20 @@ def test_notify_content_update_emits_event(monkeypatch) -> None:
 
     import my_lib.webapp.event
 
-    monkeypatch.setattr(my_lib.webapp.event, "notify_event", lambda event_type: captured.append(event_type))
+    monkeypatch.setattr(
+        my_lib.webapp.event,
+        "notify_event",
+        unittest.mock.create_autospec(
+            my_lib.webapp.event.notify_event,
+            side_effect=lambda event_type: captured.append(event_type),
+        ),
+    )
 
     price_platform.webapp.notify_content_update()
 
     assert captured == [my_lib.webapp.event.EVENT_TYPE.CONTENT]
+
+
+def _check_protocol_conformance() -> None:
+    """型チェッカーが Protocol 適合性を検証する."""
+    _: price_platform.webapp.request_context.SupportsRequestConnection = _ConnectionStub()

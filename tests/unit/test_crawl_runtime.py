@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import price_platform.managers.crawl_runtime
 from price_platform.managers import (
     managed_crawl_runtime,
 )
@@ -47,3 +48,8 @@ def test_managed_crawl_runtime_skips_notification_when_disabled() -> None:
 
     assert init_calls == []
     assert cleared == [None]
+
+
+def _check_protocol_conformance() -> None:
+    """型チェッカーが Protocol 適合性を検証する."""
+    _: price_platform.managers.crawl_runtime.SupportsStop = DummyNotificationManager()

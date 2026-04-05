@@ -4,18 +4,25 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from typing import Protocol
 
 import flask
 
-from price_platform.managers.pod_memory_tracker import MemorySeriesSnapshot, PodMemoryTracker
+from price_platform.managers.pod_memory_tracker import MemorySeriesSnapshot
 from price_platform.memory_svg import generate_memory_usage_svg
+
+
+class SupportsMemorySnapshot(Protocol):
+    """メモリスナップショットを取得可能なオブジェクトのプロトコル。"""
+
+    def get_snapshot(self) -> MemorySeriesSnapshot: ...
 
 
 def install_runtime_memory_routes(
     app: flask.Flask,
     *,
     url_prefix: str,
-    tracker_getter: Callable[[], PodMemoryTracker],
+    tracker_getter: Callable[[], SupportsMemorySnapshot],
     logger: logging.Logger | None = None,
 ) -> None:
     app_logger = logger or logging.getLogger(__name__)

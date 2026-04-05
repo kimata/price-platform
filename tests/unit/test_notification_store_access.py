@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import price_platform.notification
+import price_platform.notification._notification_store_types
 
 
 class _NotificationConfigStub:
@@ -29,3 +30,10 @@ def test_open_existing_notification_store_returns_none_when_db_missing(tmp_path:
     config = _ConfigStub(True, tmp_path / "notification.db")
 
     assert price_platform.notification.open_existing_notification_store(config) is None
+
+
+def _check_protocol_conformance() -> None:
+    """型チェッカーが Protocol 適合性を検証する."""
+    _: price_platform.notification._notification_store_types.SupportsNotificationStoreConfig = _ConfigStub(
+        True, Path("x")
+    )

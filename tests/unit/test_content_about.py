@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unittest.mock
 from pathlib import Path
 
 import price_platform.content.about
@@ -24,15 +25,18 @@ def test_load_about_content_parses_loaded_data(monkeypatch, tmp_path: Path) -> N
     monkeypatch.setattr(
         price_platform.content.about.price_platform._adapters,
         "load_yaml_config",
-        lambda *_args, **_kwargs: {
-            "author": {"name": "Kimata", "icon": "/icon.png"},
-            "title": "About",
-            "description": "Description",
-            "introduction": "Intro",
-            "site_features": [{"title": "Fast", "description": "Fast enough"}],
-            "contact": {"twitter": "@kimata"},
-            "affiliate_disclosure": {"title": "Affiliate", "description": "Disclosure"},
-        },
+        unittest.mock.create_autospec(
+            price_platform.content.about.price_platform._adapters.load_yaml_config,
+            return_value={
+                "author": {"name": "Kimata", "icon": "/icon.png"},
+                "title": "About",
+                "description": "Description",
+                "introduction": "Intro",
+                "site_features": [{"title": "Fast", "description": "Fast enough"}],
+                "contact": {"twitter": "@kimata"},
+                "affiliate_disclosure": {"title": "Affiliate", "description": "Disclosure"},
+            },
+        ),
     )
 
     content = price_platform.content.about.load_about_content(about_file, schema_file)

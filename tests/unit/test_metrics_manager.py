@@ -171,3 +171,9 @@ def test_metrics_manager_starts_and_stops_memory_tracker() -> None:
 
     assert tracker.started_at == [started_at]
     assert tracker.stop_calls == 1
+
+
+def _check_protocol_conformance() -> None:
+    """型チェッカーが Protocol 適合性を検証する."""
+    _db: price_platform.managers.metrics_manager.MetricsDBProtocol = DummyMetricsDB()
+    _tracker: price_platform.managers.metrics_manager.SessionMemoryTrackerProtocol = DummyMemoryTracker()

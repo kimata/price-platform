@@ -41,7 +41,7 @@ from .dependencies import (
 )
 from .headers import CacheRule, apply_common_headers
 from .request_context import install_request_hooks
-from .runtime_memory_routes import install_runtime_memory_routes
+from .runtime_memory_routes import SupportsMemorySnapshot, install_runtime_memory_routes
 
 __all__ = [
     "AppDependencies",
@@ -53,14 +53,15 @@ __all__ = [
     "PlatformAppSpec",
     "SeoRoutesSpec",
     "StandardPlatformAppSpec",
-    "WebApiDependencySpec",
+    "SupportsMemorySnapshot",
     "WebApiContext",
+    "WebApiDependencySpec",
     "WebAppSettings",
     "apply_common_headers",
     "build_app_dependencies",
     "build_app_services",
-    "build_webapi_dependencies",
     "build_webapi_context",
+    "build_webapi_dependencies",
     "configure_app",
     "create_app",
     "create_configured_platform_app",
