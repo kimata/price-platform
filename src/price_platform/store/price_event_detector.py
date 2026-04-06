@@ -37,6 +37,22 @@ from ._price_event_types import (
 
 logger = logging.getLogger(__name__)
 
+STANDARD_PERIOD_LOW_WINDOWS: tuple[int, ...] = (30, 60, 90, 180, 365)
+STANDARD_FLEA_MARKET_STORE_NAMES: tuple[str, ...] = ("MERCARI", "RAKUMA", "PAYPAY")
+
+
+def build_standard_period_event_map(event_types: Any) -> dict[int, Any]:
+    """Build the conventional PERIOD_LOW_* mapping for consumer apps."""
+    return {
+        days: getattr(event_types, f"PERIOD_LOW_{days}")
+        for days in STANDARD_PERIOD_LOW_WINDOWS
+    }
+
+
+def build_standard_flea_market_stores(store_types: Any) -> tuple[Any, ...]:
+    """Resolve the conventional flea-market store members from an enum-like type."""
+    return tuple(getattr(store_types, name) for name in STANDARD_FLEA_MARKET_STORE_NAMES)
+
 
 class KeywordEventFactory(Generic[PriceEventT]):
     """Adapter from ``**kwargs`` callables to the typed event-factory protocol."""
