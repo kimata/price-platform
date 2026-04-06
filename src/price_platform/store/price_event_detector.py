@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import inspect
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Generic
 
@@ -16,6 +17,7 @@ from ._price_event_rules import (
     check_period_low,
     check_price_drop,
     check_price_recovery,
+    check_statistical_low,
 )
 from ._price_event_suppression import apply_event_suppression
 from ._price_event_types import (
@@ -41,9 +43,12 @@ class KeywordEventFactory(Generic[PriceEventT]):
 
     def __init__(self, builder: Callable[..., PriceEventT]):
         self._builder = builder
+        self._allowed_kwargs = set(inspect.signature(builder).parameters)
 
     def create_event(self, draft: PriceEventDraft) -> PriceEventT:
-        return self._builder(**draft.to_kwargs())
+        payload = draft.to_kwargs()
+        filtered = {key: value for key, value in payload.items() if key in self._allowed_kwargs}
+        return self._builder(**filtered)
 
 
 class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
@@ -100,10 +105,22 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
                 cheapest_new,
                 now,
                 event_types=self.event_types,
+                config=self.config,
                 extra_fields=cheapest_new_metadata,
             )
             if all_time_event:
                 drafts.append(all_time_event)
+
+            statistical_event = check_statistical_low(
+                ctx,
+                cheapest_new,
+                now,
+                event_types=self.event_types,
+                config=self.config,
+                extra_fields=cheapest_new_metadata,
+            )
+            if statistical_event:
+                drafts.append(statistical_event)
 
             if not all_time_event:
                 period_event = check_period_low(

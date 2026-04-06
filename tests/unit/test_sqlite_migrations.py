@@ -2,11 +2,48 @@ from __future__ import annotations
 
 import pathlib
 import sqlite3
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
 
 from price_platform.notification.webpush_store import BaseWebPushStore
 from price_platform.schema_registry import bundled_schema_dir, resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
 from price_platform.store.price_event_store import BasePriceEventStore
+
+
+class _EventType(StrEnum):
+    STATISTICAL_LOW = "STATISTICAL_LOW"
+
+
+@dataclass(frozen=True)
+class _StoredEvent:
+    event_type: _EventType
+    priority: int
+    product_id: str
+    store: str
+    price: int
+    url: str | None
+    previous_price: int | None
+    reference_price: int | None
+    change_percent: float | None
+    period_days: int | None
+    percentile_rank: float | None
+    rarity_tier: str | None
+    baseline_price: int | None
+    sample_days: int | None
+    sample_count: int | None
+    rarity_window_days: int | None
+    detector_version: str | None
+    canonical_variant_key: str | None
+    event_family: str | None
+    comparison_basis: str | None
+    severity: str | None
+    recorded_at: datetime
+    suppressed: bool = False
+    superseded_by: int | None = None
+    twitter_posted: bool = False
+    twitter_enabled: bool = True
 
 
 def _write_schema(path: pathlib.Path, sql: str) -> None:
@@ -57,9 +94,60 @@ def test_price_event_store_uses_canonical_schema_without_compat_migrations(tmp_p
         metadata = dict(conn.execute("SELECT key, value FROM schema_metadata").fetchall())
 
     assert "selection_key" in columns
-    assert "canonicalize-price-events-selection" not in migrations
+    assert "percentile_rank" in columns
+    assert "rarity_tier" in columns
+    assert "baseline_price" in columns
+    assert "detector_version" in columns
+    assert "add-price-event-stat-columns" in migrations
     assert metadata["schema_name"] == "sqlite_price_events.schema"
     assert metadata["schema_sha256"]
+
+
+def test_price_event_store_persists_stat_fields(tmp_path: pathlib.Path) -> None:
+    db_path = tmp_path / "events.db"
+    store = BasePriceEventStore(
+        db_path=db_path,
+        selection_column=None,
+        event_factory=lambda row, selection: {"row": row, "selection": selection},
+    )
+    event = _StoredEvent(
+        event_type=_EventType.STATISTICAL_LOW,
+        priority=3,
+        product_id="p1",
+        store="shop",
+        price=9800,
+        url="https://example.com/p1",
+        previous_price=None,
+        reference_price=None,
+        change_percent=-12.5,
+        period_days=None,
+        percentile_rank=1.2,
+        rarity_tier="VERY_HIGH",
+        baseline_price=11200,
+        sample_days=90,
+        sample_count=90,
+        rarity_window_days=365,
+        detector_version="v2",
+        canonical_variant_key="variant-1",
+        event_family="statistical_low",
+        comparison_basis="historical_distribution",
+        severity="very_high",
+        recorded_at=datetime(2026, 4, 6, 12, 0, 0),
+    )
+
+    store.save_event(event)
+
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT percentile_rank, rarity_tier, baseline_price, sample_days, sample_count,
+                   rarity_window_days, detector_version, canonical_variant_key,
+                   event_family, comparison_basis, severity
+            FROM price_events
+            """
+        ).fetchone()
+
+    assert row == (1.2, "VERY_HIGH", 11200, 90, 90, 365, "v2", "variant-1", "statistical_low", "historical_distribution", "very_high")
 
 
 def test_webpush_store_uses_canonical_schema_without_compat_migrations(tmp_path: pathlib.Path) -> None:

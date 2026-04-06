@@ -128,6 +128,8 @@ def _select_human_line(ctx: SocialPostContext) -> str | None:
 def _default_trust_lines(ctx: SocialPostContext) -> list[str]:
     if ctx.event_type_value == "all_time_low":
         return ["価格推移を追っている人には判断しやすい更新です。"]
+    if ctx.event_type_value == "statistical_low":
+        return ["過去の価格分布と見比べても珍しい水準です。"]
     if ctx.event_type_value == "price_drop":
         return ["以前の価格と比べて目立った値下がりです。"]
     if ctx.event_type_value == "good_used_deal":
@@ -152,6 +154,8 @@ def _select_trust_line(ctx: SocialPostContext) -> str | None:
 def _build_headline(ctx: SocialPostContext) -> str:
     if ctx.event_type_value == "all_time_low":
         body = "いまかなり注目の価格です。"
+    elif ctx.event_type_value == "statistical_low":
+        body = "相場と比べてもかなり安めの水準です。"
     elif ctx.event_type_value == "flea_bargain":
         body = "相場より低めの出物です。"
     elif ctx.event_type_value.startswith("period_low_"):
@@ -174,6 +178,8 @@ def _build_fact_line(ctx: SocialPostContext) -> str:
 
     if ctx.event_type_value == "all_time_low" and ctx.previous_price:
         return f"{base}。これまでの底値 {ctx.previous_price:,}円 を更新。"
+    if ctx.event_type_value == "statistical_low":
+        return f"{base}。過去の価格推移と見比べても安値圏です。"
     if ctx.event_type_value == "price_drop" and ctx.previous_price:
         return f"{base}。前回 {ctx.previous_price:,}円 から下がっています。"
     if ctx.event_type_value.startswith("period_low_") and ctx.reference_price and ctx.change_percent is not None:

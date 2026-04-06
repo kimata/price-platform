@@ -15,6 +15,8 @@ from price_platform.platform import clock
 from price_platform.schema_registry import resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
 
+from ._price_event_migrations import PRICE_EVENT_MIGRATIONS
+
 CANONICAL_SELECTION_COLUMN = "selection_key"
 
 LockingMode = Literal["NORMAL", "EXCLUSIVE"]
@@ -54,6 +56,28 @@ class PriceEventProtocol(Protocol):
     @property
     def period_days(self) -> int | None: ...
     @property
+    def percentile_rank(self) -> float | None: ...
+    @property
+    def rarity_tier(self) -> str | None: ...
+    @property
+    def baseline_price(self) -> int | None: ...
+    @property
+    def sample_days(self) -> int | None: ...
+    @property
+    def sample_count(self) -> int | None: ...
+    @property
+    def rarity_window_days(self) -> int | None: ...
+    @property
+    def detector_version(self) -> str | None: ...
+    @property
+    def canonical_variant_key(self) -> str | None: ...
+    @property
+    def event_family(self) -> str | None: ...
+    @property
+    def comparison_basis(self) -> str | None: ...
+    @property
+    def severity(self) -> str | None: ...
+    @property
     def recorded_at(self) -> datetime: ...
     @property
     def suppressed(self) -> bool: ...
@@ -84,7 +108,7 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
             db_path=db_path,
             schema_path=resolve_schema_path("sqlite_price_events.schema"),
             locking_mode=locking_mode,
-            migrations=(),
+            migrations=PRICE_EVENT_MIGRATIONS,
         )
 
     @contextmanager
@@ -105,8 +129,11 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
                 INSERT INTO price_events
                     (event_type, priority, product_id, store, price, url,
                      previous_price, reference_price, change_percent, period_days,
+                     percentile_rank, rarity_tier, baseline_price, sample_days, sample_count,
+                     rarity_window_days, detector_version, canonical_variant_key,
+                     event_family, comparison_basis, severity,
                      {selection_sql}recorded_at, suppressed, superseded_by, twitter_posted, twitter_enabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {selection_placeholder}?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {selection_placeholder}?, ?, ?, ?, ?)
                 """,
                 (
                     event.event_type.value,
@@ -119,6 +146,17 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
                     event.reference_price,
                     event.change_percent,
                     event.period_days,
+                    getattr(event, "percentile_rank", None),
+                    getattr(event, "rarity_tier", None),
+                    getattr(event, "baseline_price", None),
+                    getattr(event, "sample_days", None),
+                    getattr(event, "sample_count", None),
+                    getattr(event, "rarity_window_days", None),
+                    getattr(event, "detector_version", None),
+                    getattr(event, "canonical_variant_key", None),
+                    getattr(event, "event_family", None),
+                    getattr(event, "comparison_basis", None),
+                    getattr(event, "severity", None),
                     *((selection_value,) if self._selection_column else ()),
                     event.recorded_at.isoformat(),
                     event.suppressed,

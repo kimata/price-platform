@@ -10,6 +10,7 @@ from typing import Any, Generic, Protocol, TypeVar
 
 from price_platform.config import TwitterConfig
 from price_platform.social_posts import SocialCopyMetadata, SocialPostContext, compose_social_post
+from price_platform.store._price_event_message import format_event_message_from_event
 
 from .webpush_sender import WebPushResult, build_detail_url
 
@@ -282,7 +283,9 @@ class BaseNotificationManager(
             if product is not None
             else event.product_id
         )
-        message = f"{event.event_type.emoji} {event.format_message(display_name)}"
+        formatter = getattr(event, "format_message", None)
+        body = formatter(display_name) if callable(formatter) else format_event_message_from_event(event, display_name)
+        message = f"{event.event_type.emoji} {body}"
 
         if product is not None and self.config.webapp.external_url:
             message = build_social_message(

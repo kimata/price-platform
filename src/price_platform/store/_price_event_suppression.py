@@ -17,6 +17,20 @@ def _event_label(event: DetectedPriceEventProtocol) -> str:
     return getattr(event.event_type, "label", str(event.event_type))
 
 
+def _is_same_state(existing: DetectedPriceEventProtocol, candidate: DetectedPriceEventProtocol, tolerance: int) -> bool:
+    existing_family = getattr(existing, "event_family", None)
+    candidate_family = getattr(candidate, "event_family", None)
+    if existing_family and candidate_family and existing_family != candidate_family:
+        return False
+
+    existing_tier = getattr(existing, "rarity_tier", None)
+    candidate_tier = getattr(candidate, "rarity_tier", None)
+    if existing_tier != candidate_tier:
+        return False
+
+    return abs(existing.price - candidate.price) <= tolerance
+
+
 def apply_event_suppression(
     *,
     event_store: PriceEventStoreProtocol[_EventT],
@@ -48,6 +62,10 @@ def apply_event_suppression(
         event_id = event_store.save_event(best_new)
         logger.info("新規イベント保存: %s - %s (ID: %s)", _event_label(best_new), product_id, event_id)
         return [replace(best_new, id=event_id)]  # type: ignore[type-var]  # ty: ignore[invalid-argument-type]
+
+    if _is_same_state(existing, best_new, config.same_price_tolerance):
+        logger.debug("同一状態イベント抑制: %s - %s", _event_label(best_new), product_id)
+        return []
 
     if best_new.priority < existing.priority:
         event_id = event_store.save_event(best_new)
