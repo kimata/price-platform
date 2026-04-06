@@ -14,11 +14,25 @@ from ._metrics_auth_service import (
     issue_auth_token,
     verify_auth_token,
 )
+from .rate_limiter import InMemoryRateLimiter
+
+
+def build_standard_metrics_auth_facade(
+    *,
+    config_getter,
+    limiter: InMemoryRateLimiter | None = None,
+) -> MetricsAuthFacade:
+    """Build the conventional metrics auth facade used by consumer apps."""
+    return build_metrics_auth_facade(
+        config_getter=config_getter,
+        limiter=limiter,
+    )
 
 __all__ = [
     "JWT_ALGORITHM",
     "MetricsAuthFacade",
     "MetricsAuthSettings",
+    "build_standard_metrics_auth_facade",
     "SupportsMetricsConfig",
     "build_metrics_auth_facade",
     "build_metrics_auth_settings_getter",

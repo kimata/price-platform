@@ -156,6 +156,13 @@ def build_service_builder(
     return lambda config: build_app_services(config, factories)
 
 
+def build_standard_service_builder(
+    factories: ServiceFactories[ConfigT, MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT],
+) -> Callable[[ConfigT], price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]]:
+    """標準 Web API 向け service builder を返す。"""
+    return build_service_builder(factories)
+
+
 def build_standard_webapi_dependency_spec(
     *,
     extension_key: str | None = None,
