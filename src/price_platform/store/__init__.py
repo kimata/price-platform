@@ -3,6 +3,39 @@
 from __future__ import annotations
 
 from importlib import import_module
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ._price_event_enum import PriceEventType as PriceEventType
+    from ._price_event_message import (
+        format_event_message as format_event_message,
+        format_event_message_from_event as format_event_message_from_event,
+    )
+    from .fetcher_common import (
+        ColorLabelFilterConfig as ColorLabelFilterConfig,
+        ProductNameFilterConfig as ProductNameFilterConfig,
+        ReferencePrices as ReferencePrices,
+        SharedBaseFetcher as SharedBaseFetcher,
+        exclude_suspicious_prices as exclude_suspicious_prices,
+        filter_by_color_label as filter_by_color_label,
+        filter_by_product_name_match as filter_by_product_name_match,
+    )
+    from .price_event_detector import (
+        PriceContext as PriceContext,
+        PriceEventConfig as PriceEventConfig,
+        PriceEventDetector as PriceEventDetector,
+    )
+    from .price_event_store import BasePriceEventStore as BasePriceEventStore
+    from .scrape_retry import (
+        ScrapeRetryOutcome as ScrapeRetryOutcome,
+        run_scrape_with_retry as run_scrape_with_retry,
+    )
+    from .selection import (
+        append_selection_filter as append_selection_filter,
+        build_current_prices_filter as build_current_prices_filter,
+    )
+    from .shuffle import group_shuffle as group_shuffle
+    from .webdriver_pool import BaseWebDriverPool as BaseWebDriverPool
 
 _EXPORTS = {
     "ColorLabelFilterConfig": (".fetcher_common", "ColorLabelFilterConfig"),

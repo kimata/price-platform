@@ -7,7 +7,7 @@ import statistics
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from ._price_event_types import PriceHistoryPoint, PriceRecordProtocol
@@ -32,7 +32,7 @@ def build_daily_price_points(
 ) -> list[PriceHistoryPoint]:
     """Compress raw observations into daily representative prices."""
 
-    grouped: dict[datetime.date, list[PriceRecordProtocol[Any]]] = defaultdict(list)
+    grouped: dict[date, list[PriceRecordProtocol[Any]]] = defaultdict(list)
     for record in sorted(history, key=lambda item: item.recorded_at):
         grouped[record.recorded_at.date()].append(record)
 

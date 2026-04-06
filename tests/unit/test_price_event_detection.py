@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
+from typing import Never
 
 from price_platform.store._price_event_rules import (
     check_price_drop,
@@ -49,7 +50,7 @@ def _build_context(
     full_new_history: list[DummyPriceRecord],
     stable_history_by_days: dict[int, list[PriceHistoryPoint]],
     all_time_lowest_new: DummyPriceRecord | None = None,
-) -> PriceContext[DummyPriceRecord, object]:
+) -> PriceContext[DummyPriceRecord, Never]:
     return PriceContext(
         product_id="product-1",
         canonical_variant_key="variant-1",
@@ -183,18 +184,30 @@ def test_check_price_recovery_uses_sustained_days() -> None:
     assert draft.event_type == DummyEventType.PRICE_RECOVERY
 
 
+@dataclass(frozen=True)
+class DummyDetectedEvent:
+    event_type: str
+    product_id: str
+    store: str
+    price: int
+    url: str | None
+    recorded_at: datetime
+    id: int | None = None
+    priority: int = 0
+
+
 def test_keyword_event_factory_filters_unknown_kwargs() -> None:
     now = datetime(2026, 4, 6, 12, 0, 0)
 
-    def build_legacy_event(*, event_type: str, product_id: str, store: str, price: int, url: str | None, recorded_at: datetime) -> dict[str, object]:
-        return {
-            "event_type": event_type,
-            "product_id": product_id,
-            "store": store,
-            "price": price,
-            "url": url,
-            "recorded_at": recorded_at,
-        }
+    def build_legacy_event(*, event_type: str, product_id: str, store: str, price: int, url: str | None, recorded_at: datetime) -> DummyDetectedEvent:
+        return DummyDetectedEvent(
+            event_type=event_type,
+            product_id=product_id,
+            store=store,
+            price=price,
+            url=url,
+            recorded_at=recorded_at,
+        )
 
     factory = KeywordEventFactory(build_legacy_event)
     draft = check_statistical_low(
@@ -216,4 +229,4 @@ def test_keyword_event_factory_filters_unknown_kwargs() -> None:
     assert draft is not None
     event = factory.create_event(draft)
 
-    assert event["product_id"] == "product-1"
+    assert event.product_id == "product-1"
