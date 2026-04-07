@@ -106,5 +106,6 @@ renovate:
         - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
           when: never
         - if: $CI_PIPELINE_SOURCE == "schedule"
-        - changes:
+        - if: $CI_PIPELINE_SOURCE == "push"
+          changes:
               - renovate.json
