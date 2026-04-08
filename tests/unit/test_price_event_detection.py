@@ -230,3 +230,39 @@ def test_keyword_event_factory_filters_unknown_kwargs() -> None:
     event = factory.create_event(draft)
 
     assert event.product_id == "product-1"
+
+
+def test_keyword_event_factory_passes_through_var_keyword() -> None:
+    """**kwargs シグネチャの関数にはフィルタリングせず全引数を渡す."""
+    from typing import Any
+
+    now = datetime(2026, 4, 6, 12, 0, 0)
+
+    def build_event_via_kwargs(**kwargs: Any) -> DummyDetectedEvent:
+        accepted = {
+            k: v for k, v in kwargs.items() if k in DummyDetectedEvent.__dataclass_fields__
+        }
+        return DummyDetectedEvent(**accepted)
+
+    factory = KeywordEventFactory(build_event_via_kwargs)
+    draft = check_statistical_low(
+        _build_context(
+            now=now,
+            current=DummyPriceRecord(price=70, recorded_at=now),
+            full_new_history=[DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1)) for day in range(120)],
+            stable_history_by_days={
+                365: [PriceHistoryPoint(price=100, recorded_at=now - timedelta(days=day + 1)) for day in range(120)]
+            },
+            all_time_lowest_new=DummyPriceRecord(price=70, recorded_at=now - timedelta(days=200)),
+        ),
+        DummyPriceRecord(price=70, recorded_at=now),
+        now,
+        event_types=DummyEventTypes,
+        config=PriceEventConfig(rarity_window_days=365),
+        extra_fields={},
+    )
+    assert draft is not None
+    event = factory.create_event(draft)
+
+    assert event.product_id == "product-1"
+    assert event.price == 70

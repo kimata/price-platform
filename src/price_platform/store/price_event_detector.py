@@ -59,10 +59,16 @@ class KeywordEventFactory(Generic[PriceEventT]):
 
     def __init__(self, builder: Callable[..., PriceEventT]):
         self._builder = builder
-        self._allowed_kwargs = set(inspect.signature(builder).parameters)
+        sig = inspect.signature(builder)
+        self._has_var_keyword = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+        self._allowed_kwargs = set(sig.parameters)
 
     def create_event(self, draft: PriceEventDraft) -> PriceEventT:
         payload = draft.to_kwargs()
+        if self._has_var_keyword:
+            return self._builder(**payload)
         filtered = {key: value for key, value in payload.items() if key in self._allowed_kwargs}
         return self._builder(**filtered)
 
