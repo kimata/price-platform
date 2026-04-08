@@ -85,14 +85,38 @@ def generate_memory_usage_svg(
 
     x_ticks = []
     tick_count = min(5, len(samples))
+    char_width_est = 7.2
+    min_gap = 8
+    prev_right_edge = -float("inf")
+
     for index in range(tick_count):
         sample = samples[round(index * (len(samples) - 1) / max(tick_count - 1, 1))]
         x = x_pos(sample.timestamp)
         label = _format_tick(sample.timestamp)
+        label_width = len(label) * char_width_est
+
+        is_first = index == 0
+        is_last = index == tick_count - 1
+
+        if is_last and tick_count > 1:
+            anchor = "end"
+            left_edge = x - label_width
+        elif is_first:
+            anchor = "start"
+            left_edge = x
+        else:
+            anchor = "middle"
+            left_edge = x - label_width / 2
+
+        if left_edge < prev_right_edge + min_gap:
+            continue
+
+        prev_right_edge = left_edge + label_width
+
         x_ticks.append(
             f'<line x1="{x:.1f}" y1="{margin_top}" x2="{x:.1f}" y2="{margin_top + chart_height}" '
             'stroke="#f1f5f9" stroke-width="1"/>'
-            f'<text x="{x:.1f}" y="{height - 16}" text-anchor="middle" '
+            f'<text x="{x:.1f}" y="{height - 16}" text-anchor="{anchor}" '
             'font-size="12" fill="#475569">'
             f"{escape(label)}</text>"
         )
@@ -134,7 +158,7 @@ def _legend(x: int, y: int, color: str, label: str) -> str:
 
 
 def _format_tick(timestamp: datetime) -> str:
-    return timestamp.strftime("%m-%d %H:%M")
+    return f"{timestamp.month}月{timestamp.day}日 {timestamp.strftime('%H:%M')}"
 
 
 def _empty_svg(*, width: int, height: int, message: str) -> str:
