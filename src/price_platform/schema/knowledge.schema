@@ -1,0 +1,115 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Knowledge article content schema",
+    "type": "object",
+    "required": ["id", "title", "description", "hero_text", "sections", "faq"],
+    "additionalProperties": false,
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Article ID (URL slug)",
+            "pattern": "^[a-z0-9-]+$"
+        },
+        "title": {
+            "type": "string",
+            "description": "Article title"
+        },
+        "description": {
+            "type": "string",
+            "description": "Meta description for SEO"
+        },
+        "hero_text": {
+            "type": "string",
+            "description": "Hero section text (Markdown supported)"
+        },
+        "date_published": {
+            "type": "string",
+            "description": "Publication date (ISO 8601)",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "date_modified": {
+            "type": "string",
+            "description": "Last modification date (ISO 8601)",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "sections": {
+            "type": "array",
+            "description": "Article sections",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": ["title", "content"],
+                "additionalProperties": false,
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Section title"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Section content (Markdown)"
+                    }
+                }
+            }
+        },
+        "faq": {
+            "type": "array",
+            "description": "FAQ items",
+            "items": {
+                "type": "object",
+                "required": ["question", "answer"],
+                "additionalProperties": false,
+                "properties": {
+                    "question": {
+                        "type": "string"
+                    },
+                    "answer": {
+                        "type": "string",
+                        "description": "Answer text (Markdown supported)"
+                    }
+                }
+            }
+        },
+        "related_guides": {
+            "type": "array",
+            "description": "Related guide IDs",
+            "items": {
+                "type": "string"
+            }
+        },
+        "related_knowledge": {
+            "type": "array",
+            "description": "Related knowledge article IDs",
+            "items": {
+                "type": "string"
+            }
+        },
+        "primary_keyword": {
+            "type": "string",
+            "description": "Primary search keyword for SEO"
+        },
+        "secondary_keywords": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Secondary keywords for SEO"
+        },
+        "search_intent": {
+            "type": "string",
+            "enum": ["informational", "transactional", "navigational"],
+            "description": "User search intent type"
+        },
+        "target_audience": {
+            "type": "string",
+            "description": "Target reader description"
+        },
+        "tags": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Tags for categorization"
+        }
+    }
+}

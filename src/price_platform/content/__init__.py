@@ -8,12 +8,26 @@ from .about import (
     SiteFeature,
     load_about_content,
 )
+from .knowledge import (
+    FAQItem,
+    KnowledgeArticle,
+    KnowledgeCatalog,
+    KnowledgeSection,
+    KnowledgeSummary,
+    load_knowledge_catalog,
+)
 
 __all__ = [
     "AboutContent",
     "AffiliateDisclosure",
     "Author",
     "Contact",
+    "FAQItem",
+    "KnowledgeArticle",
+    "KnowledgeCatalog",
+    "KnowledgeSection",
+    "KnowledgeSummary",
     "SiteFeature",
     "load_about_content",
+    "load_knowledge_catalog",
 ]
