@@ -8,6 +8,12 @@ from .about import (
     SiteFeature,
     load_about_content,
 )
+from .editorial import (
+    EditorialPolicyContent,
+    EditorialPrinciple,
+    EditorialWorkflowStep,
+    load_editorial_policy_content,
+)
 from .knowledge import (
     FAQItem,
     KnowledgeArticle,
@@ -22,6 +28,9 @@ __all__ = [
     "AffiliateDisclosure",
     "Author",
     "Contact",
+    "EditorialPolicyContent",
+    "EditorialPrinciple",
+    "EditorialWorkflowStep",
     "FAQItem",
     "KnowledgeArticle",
     "KnowledgeCatalog",
@@ -29,5 +38,6 @@ __all__ = [
     "KnowledgeSummary",
     "SiteFeature",
     "load_about_content",
+    "load_editorial_policy_content",
     "load_knowledge_catalog",
 ]
