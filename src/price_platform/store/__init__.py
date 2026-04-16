@@ -9,29 +9,63 @@ if TYPE_CHECKING:
     from ._price_event_enum import PriceEventType as PriceEventType
     from ._price_event_message import (
         format_event_message as format_event_message,
+    )
+    from ._price_event_message import (
         format_event_message_from_event as format_event_message_from_event,
     )
     from .fetcher_common import (
         ColorLabelFilterConfig as ColorLabelFilterConfig,
-        ProductNameFilterConfig as ProductNameFilterConfig,
+    )
+    from .fetcher_common import (
+        FilterDecision as FilterDecision,
+    )
+    from .fetcher_common import (
+        FilterReason as FilterReason,
+    )
+    from .fetcher_common import (
+        FilterResult as FilterResult,
+    )
+    from .fetcher_common import (
+        ProductNameRule as ProductNameRule,
+    )
+    from .fetcher_common import (
         ReferencePrices as ReferencePrices,
+    )
+    from .fetcher_common import (
         SharedBaseFetcher as SharedBaseFetcher,
+    )
+    from .fetcher_common import (
+        default_keyword_in_title as default_keyword_in_title,
+    )
+    from .fetcher_common import (
         exclude_suspicious_prices as exclude_suspicious_prices,
+    )
+    from .fetcher_common import (
         filter_by_color_label as filter_by_color_label,
+    )
+    from .fetcher_common import (
         filter_by_product_name_match as filter_by_product_name_match,
     )
     from .price_event_detector import (
         PriceContext as PriceContext,
+    )
+    from .price_event_detector import (
         PriceEventConfig as PriceEventConfig,
+    )
+    from .price_event_detector import (
         PriceEventDetector as PriceEventDetector,
     )
     from .price_event_store import BasePriceEventStore as BasePriceEventStore
     from .scrape_retry import (
         ScrapeRetryOutcome as ScrapeRetryOutcome,
+    )
+    from .scrape_retry import (
         run_scrape_with_retry as run_scrape_with_retry,
     )
     from .selection import (
         append_selection_filter as append_selection_filter,
+    )
+    from .selection import (
         build_current_prices_filter as build_current_prices_filter,
     )
     from .shuffle import group_shuffle as group_shuffle
@@ -39,7 +73,11 @@ if TYPE_CHECKING:
 
 _EXPORTS = {
     "ColorLabelFilterConfig": (".fetcher_common", "ColorLabelFilterConfig"),
-    "ProductNameFilterConfig": (".fetcher_common", "ProductNameFilterConfig"),
+    "default_keyword_in_title": (".fetcher_common", "default_keyword_in_title"),
+    "FilterDecision": (".fetcher_common", "FilterDecision"),
+    "FilterReason": (".fetcher_common", "FilterReason"),
+    "FilterResult": (".fetcher_common", "FilterResult"),
+    "ProductNameRule": (".fetcher_common", "ProductNameRule"),
     "ReferencePrices": (".fetcher_common", "ReferencePrices"),
     "SharedBaseFetcher": (".fetcher_common", "SharedBaseFetcher"),
     "exclude_suspicious_prices": (".fetcher_common", "exclude_suspicious_prices"),

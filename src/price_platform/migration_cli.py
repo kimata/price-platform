@@ -41,6 +41,7 @@ TARGET_SPECS: dict[str, MigrationTargetSpec] = {
     "notification": MigrationTargetSpec(name="notification", schema_name="sqlite_notification.schema"),
     "metrics": MigrationTargetSpec(name="metrics", schema_name="sqlite_metrics.schema"),
     "client_metrics": MigrationTargetSpec(name="client_metrics", schema_name="sqlite_client_metrics.schema"),
+    "keyword_learning": MigrationTargetSpec(name="keyword_learning", schema_name="sqlite_keyword_learning.schema"),
     "price_events": MigrationTargetSpec(name="price_events", schema_name="sqlite_price_events.schema"),
     "webpush": MigrationTargetSpec(name="webpush", schema_name="sqlite_webpush.schema"),
 }

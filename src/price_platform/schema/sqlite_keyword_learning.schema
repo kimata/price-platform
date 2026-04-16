@@ -1,0 +1,66 @@
+CREATE TABLE IF NOT EXISTS listing_observations (
+    id INTEGER PRIMARY KEY,
+    project TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    product_name TEXT NOT NULL,
+    store_name TEXT NOT NULL,
+    listing_url TEXT NOT NULL,
+    listing_title TEXT NOT NULL,
+    listing_price INTEGER NOT NULL,
+    admitted INTEGER NOT NULL,
+    reason TEXT,
+    missing_keywords_json TEXT NOT NULL DEFAULT '[]',
+    matched_ng_words_json TEXT NOT NULL DEFAULT '[]',
+    matched_partial_item_words_json TEXT NOT NULL DEFAULT '[]',
+    matched_parts_words_json TEXT NOT NULL DEFAULT '[]',
+    matched_exclude_product_name TEXT,
+    required_keywords_json TEXT NOT NULL DEFAULT '[]',
+    anchor_keywords_json TEXT NOT NULL DEFAULT '[]',
+    exclude_product_names_json TEXT NOT NULL DEFAULT '[]',
+    reference_price INTEGER,
+    title_normalized TEXT NOT NULL,
+    captured_at TEXT NOT NULL,
+    observation_day TEXT NOT NULL,
+    UNIQUE(project, product_id, store_name, listing_url, observation_day, admitted, reason)
+);
+
+CREATE INDEX IF NOT EXISTS idx_listing_observations_product
+    ON listing_observations(project, product_id, captured_at);
+
+CREATE TABLE IF NOT EXISTS keyword_analysis_runs (
+    id INTEGER PRIMARY KEY,
+    project TEXT,
+    started_at TEXT NOT NULL,
+    observation_count INTEGER NOT NULL,
+    proposal_count INTEGER NOT NULL,
+    candidate_payloads_json TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE INDEX IF NOT EXISTS idx_keyword_analysis_runs_project
+    ON keyword_analysis_runs(project, started_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_keyword_analysis_runs_unique
+    ON keyword_analysis_runs(IFNULL(project, ''), started_at);
+
+CREATE TABLE IF NOT EXISTS keyword_proposals (
+    id INTEGER PRIMARY KEY,
+    project TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    product_name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    metrics_json TEXT NOT NULL,
+    evidence_json TEXT NOT NULL,
+    analysis_window_start TEXT,
+    analysis_window_end TEXT,
+    score REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    reviewer TEXT,
+    review_note TEXT,
+    reviewed_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(project, product_id, kind, payload_json, analysis_window_start, analysis_window_end)
+);
+
+CREATE INDEX IF NOT EXISTS idx_keyword_proposals_product
+    ON keyword_proposals(project, product_id, status, created_at);

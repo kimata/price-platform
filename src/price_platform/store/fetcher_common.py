@@ -10,6 +10,7 @@ import time
 import unicodedata
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeVar
 
 import requests
@@ -56,12 +57,17 @@ ConfigT = TypeVar("ConfigT", bound=FetcherConfigProtocol)
 
 
 @dataclass(frozen=True)
-class ProductNameFilterConfig:
-    flea_market_ng_words: tuple[str, ...]
-    condition_ng_words: tuple[str, ...]
+class ProductNameRule:
+    required_keywords: tuple[str, ...] = ()
+    anchor_keywords: tuple[str, ...] = ()
+    flea_market_ng_words: tuple[str, ...] = ()
+    condition_ng_words: tuple[str, ...] = ()
     partial_item_ng_words: tuple[str, ...] = ()
     parts_ng_words: tuple[str, ...] = ()
     parts_ng_price_threshold: int | None = None
+    exclude_product_names: tuple[str, ...] = ()
+    exclude_yo_titles: bool = False
+    exclude_empty_box_titles: bool = False
 
 
 @dataclass(frozen=True)
@@ -69,28 +75,79 @@ class ColorLabelFilterConfig:
     color_family_keywords: dict[str, tuple[str, ...]]
 
 
+class FilterReason(StrEnum):
+    EXCLUDE_PRODUCT_NAME = "exclude_product_name"
+    MISSING_KEYWORDS = "missing_keywords"
+    FLEA_MARKET_NG_WORD = "flea_market_ng_word"
+    CONDITION_NG_WORD = "condition_ng_word"
+    PARTIAL_ITEM_NG_WORD = "partial_item_ng_word"
+    PARTS_NG_WORD_BELOW_THRESHOLD = "parts_ng_word_below_threshold"
+    POLICY_EXCLUDED = "policy_excluded"
+
+
+@dataclass(frozen=True)
+class TitleExclusion:
+    reason: FilterReason
+    matched_words: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class FilterDecision(Generic[ScrapedPriceT]):
+    listing: ScrapedPriceT
+    admitted: bool
+    reason: FilterReason | None = None
+    missing_keywords: tuple[str, ...] = ()
+    matched_ng_words: tuple[str, ...] = ()
+    matched_partial_item_words: tuple[str, ...] = ()
+    matched_parts_words: tuple[str, ...] = ()
+    matched_exclude_product_name: str | None = None
+
+
+@dataclass(frozen=True)
+class FilterResult(Generic[ScrapedPriceT]):
+    rule: ProductNameRule
+    admitted: list[ScrapedPriceT]
+    decisions: list[FilterDecision[ScrapedPriceT]]
+
+    def __iter__(self):
+        return iter(self.admitted)
+
+    def __len__(self) -> int:
+        return len(self.admitted)
+
+    def __getitem__(self, index):
+        return self.admitted[index]
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, list):
+            return self.admitted == other
+        return super().__eq__(other)
+
+
 class ProductNameMatchingPolicy(Protocol):
     """製品名一致判定の差し替えポリシー。"""
 
-    def expand_keywords(self, product_name: str) -> list[str]: ...
+    def build_rule(self, *, product_name: str, base_rule: ProductNameRule) -> ProductNameRule: ...
 
     def keyword_in_title(self, keyword: str, title_upper: str) -> bool: ...
 
-    def should_exclude_title(
+    def normalize_title(self, title: str) -> str: ...
+
+    def get_title_exclusion(
         self,
         *,
         title: str,
         title_upper: str,
         title_normalized: str,
-        config: ProductNameFilterConfig,
-    ) -> bool: ...
+        rule: ProductNameRule,
+    ) -> TitleExclusion | None: ...
 
 
 @dataclass(frozen=True)
 class FetcherProfile:
     """取得処理の共通プロファイル。"""
 
-    product_name_filter: ProductNameFilterConfig
+    product_name_rule: ProductNameRule
     color_label_filter: ColorLabelFilterConfig
     webdriver_profile_name: str
     matching_policy: ProductNameMatchingPolicy
@@ -117,32 +174,63 @@ class ReferencePrices:
 class DefaultProductNameMatchingPolicy:
     """標準的な製品名一致判定ポリシー。"""
 
-    def expand_keywords(self, product_name: str) -> list[str]:
-        return product_name.split()
+    def build_rule(self, *, product_name: str, base_rule: ProductNameRule) -> ProductNameRule:
+        required_keywords = base_rule.required_keywords or tuple(product_name.split())
+        return ProductNameRule(
+            required_keywords=tuple(required_keywords),
+            anchor_keywords=tuple(base_rule.anchor_keywords),
+            flea_market_ng_words=tuple(base_rule.flea_market_ng_words),
+            condition_ng_words=tuple(base_rule.condition_ng_words),
+            partial_item_ng_words=tuple(base_rule.partial_item_ng_words),
+            parts_ng_words=tuple(base_rule.parts_ng_words),
+            parts_ng_price_threshold=base_rule.parts_ng_price_threshold,
+            exclude_product_names=tuple(base_rule.exclude_product_names),
+            exclude_yo_titles=base_rule.exclude_yo_titles,
+            exclude_empty_box_titles=base_rule.exclude_empty_box_titles,
+        )
 
     def keyword_in_title(self, keyword: str, title_upper: str) -> bool:
         return _keyword_in_title(keyword, title_upper)
 
-    def should_exclude_title(
+    def normalize_title(self, title: str) -> str:
+        return unicodedata.normalize("NFKC", title).upper()
+
+    def get_title_exclusion(
         self,
         *,
         title: str,
         title_upper: str,
         title_normalized: str,
-        config: ProductNameFilterConfig,
-    ) -> bool:
+        rule: ProductNameRule,
+    ) -> TitleExclusion | None:
         _ = title_upper
-        if "用" in title and "専用" not in title:
-            return True
-        if "空箱" in title:
-            return True
-        if any(ng in title_normalized for ng in config.flea_market_ng_words):
-            return True
-        if any(ng in title for ng in config.condition_ng_words):
-            return True
-        if config.partial_item_ng_words and any(ng in title for ng in config.partial_item_ng_words):
-            return True
-        return False
+        if rule.exclude_yo_titles and "用" in title and "専用" not in title:
+            return TitleExclusion(reason=FilterReason.POLICY_EXCLUDED)
+        if rule.exclude_empty_box_titles and "空箱" in title:
+            return TitleExclusion(reason=FilterReason.POLICY_EXCLUDED)
+
+        matched_flea_market = tuple(ng for ng in rule.flea_market_ng_words if ng in title_normalized)
+        if matched_flea_market:
+            return TitleExclusion(
+                reason=FilterReason.FLEA_MARKET_NG_WORD,
+                matched_words=matched_flea_market,
+            )
+
+        matched_condition = tuple(ng for ng in rule.condition_ng_words if ng in title)
+        if matched_condition:
+            return TitleExclusion(
+                reason=FilterReason.CONDITION_NG_WORD,
+                matched_words=matched_condition,
+            )
+
+        matched_partial = tuple(ng for ng in rule.partial_item_ng_words if ng in title)
+        if matched_partial:
+            return TitleExclusion(
+                reason=FilterReason.PARTIAL_ITEM_NG_WORD,
+                matched_words=matched_partial,
+            )
+
+        return None
 
 
 DEFAULT_PRODUCT_NAME_MATCHING_POLICY = DefaultProductNameMatchingPolicy()
@@ -164,9 +252,8 @@ def _keyword_in_title(keyword: str, title_upper: str) -> bool:
     return False
 
 
-def _title_matches_product(title_upper: str, product_name: str) -> bool:
-    keywords = product_name.split()
-    return all(_keyword_in_title(kw, title_upper) for kw in keywords)
+def default_keyword_in_title(keyword: str, title_upper: str) -> bool:
+    return _keyword_in_title(keyword, title_upper)
 
 
 def filter_by_product_name_match(
@@ -174,26 +261,37 @@ def filter_by_product_name_match(
     product_name: str,
     store_name: str,
     *,
-    exclude_product_names: list[str] | None = None,
-    config: ProductNameFilterConfig,
+    rule: ProductNameRule,
     matching_policy: ProductNameMatchingPolicy = DEFAULT_PRODUCT_NAME_MATCHING_POLICY,
-) -> list[ScrapedPriceT]:
+) -> FilterResult[ScrapedPriceT]:
     """対象製品名に合わない出品を除外する。"""
-    keywords = matching_policy.expand_keywords(product_name)
-    if not keywords:
-        return prices
+    decisions: list[FilterDecision[ScrapedPriceT]] = []
+    if not rule.required_keywords:
+        return FilterResult(
+            rule=rule,
+            admitted=list(prices),
+            decisions=[FilterDecision(listing=price, admitted=True) for price in prices],
+        )
 
-    exclude_names = exclude_product_names or []
     filtered: list[ScrapedPriceT] = []
+    exclude_name_keywords = {
+        exclude_name: matching_policy.build_rule(
+            product_name=exclude_name,
+            base_rule=ProductNameRule(
+                flea_market_ng_words=(),
+                condition_ng_words=(),
+            ),
+        ).required_keywords
+        for exclude_name in rule.exclude_product_names
+    }
 
     for price in prices:
         title = getattr(price, "title", "") or ""
-        title_upper = title.upper()
-        title_normalized = unicodedata.normalize("NFKC", title).upper()
+        title_normalized = matching_policy.normalize_title(title)
+        title_upper = title_normalized
 
         matched_exclude = None
-        for exclude_name in exclude_names:
-            exclude_keywords = matching_policy.expand_keywords(exclude_name)
+        for exclude_name, exclude_keywords in exclude_name_keywords.items():
             if all(matching_policy.keyword_in_title(kw, title_upper) for kw in exclude_keywords):
                 matched_exclude = exclude_name
                 break
@@ -206,9 +304,19 @@ def filter_by_product_name_match(
                 matched_exclude,
                 f"{title[:50]}..." if len(title) > 50 else title,
             )
+            decisions.append(
+                FilterDecision(
+                    listing=price,
+                    admitted=False,
+                    reason=FilterReason.EXCLUDE_PRODUCT_NAME,
+                    matched_exclude_product_name=matched_exclude,
+                )
+            )
             continue
 
-        missing_keywords = [kw for kw in keywords if not matching_policy.keyword_in_title(kw, title_upper)]
+        missing_keywords = [
+            kw for kw in rule.required_keywords if not matching_policy.keyword_in_title(kw, title_upper)
+        ]
         if missing_keywords:
             logger.debug(
                 "%s: %s - タイトル不一致で除外 「%s」（不足: %s）",
@@ -217,27 +325,66 @@ def filter_by_product_name_match(
                 f"{title[:50]}..." if len(title) > 50 else title,
                 ", ".join(missing_keywords),
             )
+            decisions.append(
+                FilterDecision(
+                    listing=price,
+                    admitted=False,
+                    reason=FilterReason.MISSING_KEYWORDS,
+                    missing_keywords=tuple(missing_keywords),
+                )
+            )
             continue
 
-        if matching_policy.should_exclude_title(
+        title_exclusion = matching_policy.get_title_exclusion(
             title=title,
             title_upper=title_upper,
             title_normalized=title_normalized,
-            config=config,
-        ):
+            rule=rule,
+        )
+        if title_exclusion is not None:
+            decision = FilterDecision(
+                listing=price,
+                admitted=False,
+                reason=title_exclusion.reason,
+            )
+            if title_exclusion.reason in (FilterReason.FLEA_MARKET_NG_WORD, FilterReason.CONDITION_NG_WORD):
+                decision = FilterDecision(
+                    listing=price,
+                    admitted=False,
+                    reason=title_exclusion.reason,
+                    matched_ng_words=title_exclusion.matched_words,
+                )
+            elif title_exclusion.reason is FilterReason.PARTIAL_ITEM_NG_WORD:
+                decision = FilterDecision(
+                    listing=price,
+                    admitted=False,
+                    reason=title_exclusion.reason,
+                    matched_partial_item_words=title_exclusion.matched_words,
+                )
+            decisions.append(decision)
             continue
 
         if (
-            config.parts_ng_words
-            and config.parts_ng_price_threshold is not None
-            and price.price < config.parts_ng_price_threshold
-            and any(ng in title_normalized for ng in config.parts_ng_words)
+            rule.parts_ng_words
+            and rule.parts_ng_price_threshold is not None
+            and price.price < rule.parts_ng_price_threshold
         ):
-            continue
+            matched_parts = tuple(ng for ng in rule.parts_ng_words if ng in title_normalized)
+            if matched_parts:
+                decisions.append(
+                    FilterDecision(
+                        listing=price,
+                        admitted=False,
+                        reason=FilterReason.PARTS_NG_WORD_BELOW_THRESHOLD,
+                        matched_parts_words=matched_parts,
+                    )
+                )
+                continue
 
         filtered.append(price)
+        decisions.append(FilterDecision(listing=price, admitted=True))
 
-    return filtered
+    return FilterResult(rule=rule, admitted=filtered, decisions=decisions)
 
 
 def exclude_suspicious_prices(
@@ -301,14 +448,29 @@ def filter_by_product_name_profile(
     *,
     profile: FetcherProfile,
     exclude_product_names: list[str] | None = None,
-) -> list[ScrapedPriceT]:
+) -> FilterResult[ScrapedPriceT]:
     """プロファイル定義を使って製品名フィルタを適用する。"""
+    base_rule = profile.matching_policy.build_rule(
+        product_name=product_name,
+        base_rule=profile.product_name_rule,
+    )
+    effective_rule = ProductNameRule(
+        required_keywords=base_rule.required_keywords,
+        anchor_keywords=base_rule.anchor_keywords,
+        flea_market_ng_words=base_rule.flea_market_ng_words,
+        condition_ng_words=base_rule.condition_ng_words,
+        partial_item_ng_words=base_rule.partial_item_ng_words,
+        parts_ng_words=base_rule.parts_ng_words,
+        parts_ng_price_threshold=base_rule.parts_ng_price_threshold,
+        exclude_product_names=tuple((*base_rule.exclude_product_names, *(exclude_product_names or []))),
+        exclude_yo_titles=base_rule.exclude_yo_titles,
+        exclude_empty_box_titles=base_rule.exclude_empty_box_titles,
+    )
     return filter_by_product_name_match(
         prices,
         product_name,
         store_name,
-        exclude_product_names=exclude_product_names,
-        config=profile.product_name_filter,
+        rule=effective_rule,
         matching_policy=profile.matching_policy,
     )
 
