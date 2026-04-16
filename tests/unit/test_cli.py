@@ -9,7 +9,7 @@ import price_platform.cli
 
 
 def test_lifecycle_controller_requests_shutdown(monkeypatch) -> None:
-    handlers: dict[int, typing.Any] = {}  # noqa: UP006
+    handlers: dict[int, typing.Any] = {}
 
     monkeypatch.setattr(
         signal,

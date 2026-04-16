@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import collections.abc
 import logging
 import sqlite3
-from collections.abc import Callable, Generator
-import collections.abc
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path

@@ -176,23 +176,23 @@ def build_social_message(
 ) -> str:
     """戦略群を使って SNS 投稿文面を組み立てる。"""
     selection_key = strategies.selection_key.resolve(event, product)
-    detail_url = build_detail_url(external_url, getattr(event, "product_id"), selection_key)
+    detail_url = build_detail_url(external_url, event.product_id, selection_key)
     post = compose_social_post(
         SocialPostContext(
-            product_id=getattr(event, "product_id"),
+            product_id=event.product_id,
             product_line=strategies.product_line.build(product, event),
             detail_url=detail_url,
-            event_type_value=getattr(getattr(event, "event_type"), "value"),
-            event_type_label=getattr(getattr(event, "event_type"), "label"),
-            event_emoji=getattr(getattr(event, "event_type"), "emoji"),
-            store_label=getattr(getattr(event, "store"), "label"),
-            price=getattr(event, "price"),
-            previous_price=getattr(event, "previous_price"),
-            reference_price=getattr(event, "reference_price"),
-            change_percent=getattr(event, "change_percent"),
-            period_days=getattr(event, "period_days"),
-            recorded_at=getattr(event, "recorded_at"),
-            hashtag=getattr(product, "hashtag"),
+            event_type_value=event.event_type.value,
+            event_type_label=event.event_type.label,
+            event_emoji=event.event_type.emoji,
+            store_label=event.store.label,
+            price=event.price,
+            previous_price=event.previous_price,
+            reference_price=event.reference_price,
+            change_percent=event.change_percent,
+            period_days=event.period_days,
+            recorded_at=event.recorded_at,
+            hashtag=product.hashtag,
             social_copy=strategies.social_copy.build(product),
         )
     )

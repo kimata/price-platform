@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import logging
 import inspect
+import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Generic
 
@@ -28,10 +28,8 @@ from ._price_event_types import (
     PriceEventDraft,
     PriceEventStoreProtocol,
     PriceEventT,
-    PriceRecordProtocol,
     PriceRecordT,
     PriceStoreProtocol,
-    SoldRecordProtocol,
     SoldRecordT,
 )
 

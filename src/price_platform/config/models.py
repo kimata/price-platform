@@ -24,7 +24,7 @@ class AmazonStoreConfig:
     version: str = "3.3"
 
     @classmethod
-    def parse(cls, data: dict[str, Any]) -> "AmazonStoreConfig":
+    def parse(cls, data: dict[str, Any]) -> AmazonStoreConfig:
         return cls(
             credential_id=data["credential_id"],
             credential_secret=data["credential_secret"],
@@ -41,7 +41,7 @@ class RakutenStoreConfig:
     affiliate_id: str | None = None
 
     @classmethod
-    def parse(cls, data: dict[str, Any]) -> "RakutenStoreConfig":
+    def parse(cls, data: dict[str, Any]) -> RakutenStoreConfig:
         return cls(
             application_id=data["application_id"],
             affiliate_id=data.get("affiliate_id"),
@@ -58,7 +58,7 @@ class YahooStoreConfig:
     affiliate_id: str | None = None
 
     @classmethod
-    def parse(cls, data: dict[str, Any]) -> "YahooStoreConfig":
+    def parse(cls, data: dict[str, Any]) -> YahooStoreConfig:
         return cls(
             client_id=data["client_id"],
             secret=data["secret"],

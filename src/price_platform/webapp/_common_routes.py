@@ -7,8 +7,9 @@ import sqlite3
 from collections.abc import Callable
 
 import flask
-import price_platform._adapters
 import werkzeug.exceptions
+
+import price_platform._adapters
 
 from ._app_specs import CommonRoutesSettings
 

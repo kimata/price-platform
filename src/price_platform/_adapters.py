@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import flask
 from pathlib import Path
 from typing import Any
+
+import flask
 
 from .platform import config as platform_config
 from .platform import webapp as platform_webapp

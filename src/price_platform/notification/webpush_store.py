@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from price_platform.platform import clock
 from price_platform.schema_registry import resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
+
 from ._webpush_store_types import (
     DeliveryLogEntry,
     DeliveryStatus,

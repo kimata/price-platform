@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import collections.abc
 import logging
 import pathlib
 import sqlite3
 import threading
-import collections.abc
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -35,7 +35,7 @@ from .sqlite_store import SQLiteStoreBase
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    pass
 
 
 class ClientMetricsDB(
@@ -108,8 +108,8 @@ __all__ = [
     "WebVitalName",
     "WebVitalRaw",
     "detect_device_type",
-    "get_client_metrics_db",
     "generate_boxplot_svg",
+    "get_client_metrics_db",
     "init_client_metrics_db",
     "open_client_metrics_db",
 ]

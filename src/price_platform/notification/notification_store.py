@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import collections.abc
 import logging
 import pathlib
 import sqlite3
-import collections.abc
 from contextlib import contextmanager
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -16,35 +16,57 @@ from price_platform.sqlite_store import SQLiteStoreBase
 from ._notification_payload import NotificationPayload, SupportsNotificationEvent, build_notification_payload
 from ._notification_posting_history_repository import (
     get_last_posted_time as repo_get_last_posted_time,
+)
+from ._notification_posting_history_repository import (
     get_last_posted_time_for_product as repo_get_last_posted_time_for_product,
 )
 from ._notification_queue_repository import (
     cleanup_old_items as repo_cleanup_old_items,
+)
+from ._notification_queue_repository import (
     enqueue_notification,
-    get_pending_count as repo_get_pending_count,
     get_pending_notifications,
+)
+from ._notification_queue_repository import (
+    get_pending_count as repo_get_pending_count,
+)
+from ._notification_queue_repository import (
     increment_retry_count as repo_increment_retry_count,
+)
+from ._notification_queue_repository import (
     mark_failed as repo_mark_failed,
+)
+from ._notification_queue_repository import (
     mark_posted as repo_mark_posted,
+)
+from ._notification_queue_repository import (
     mark_skipped as repo_mark_skipped,
+)
+from ._notification_queue_repository import (
     reset_to_pending as repo_reset_to_pending,
+)
+from ._notification_queue_repository import (
     trim_pending_keep_latest as repo_trim_pending_keep_latest,
 )
 from ._notification_rate_limit_repository import (
     clear_rate_limit_state as repo_clear_rate_limit_state,
+)
+from ._notification_rate_limit_repository import (
     get_rate_limit_state as repo_get_rate_limit_state,
+)
+from ._notification_rate_limit_repository import (
     save_rate_limit_state as repo_save_rate_limit_state,
 )
 from ._notification_store_types import (
     LockingMode,
     NotificationItem,
-    NotificationStatus,
+    NotificationStatus as NotificationStatus,
     RateLimitState,
     SupportsNotificationStoreConfig,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    pass
 
 logger = logging.getLogger(__name__)
 

@@ -45,6 +45,7 @@ __all__ = [
     "MetricsAuthConfig",
     "MetricsConfig",
     "NotificationConfig",
+    "ProfiledAppConfig",
     "RakutenStoreConfig",
     "ScrapeConfig",
     "SeleniumConfig",
@@ -60,6 +61,5 @@ __all__ = [
     "load_app_config_for",
     "parse_app_config",
     "parse_app_config_for",
-    "ProfiledAppConfig",
     "warn_unknown_keys",
 ]

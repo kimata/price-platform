@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-import logging
-import hashlib
-from collections.abc import Callable, Generator, Sequence
 import collections.abc
+import hashlib
+import logging
+import sqlite3
+from collections.abc import Callable, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-import sqlite3
 
-from .platform import clock, sqlite as platform_sqlite
+from .platform import clock
+from .platform import sqlite as platform_sqlite
 
 logger = logging.getLogger(__name__)
 

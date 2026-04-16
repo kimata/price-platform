@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 import jwt
 
@@ -35,7 +36,7 @@ def get_ssr_internal_secret(env_var: str) -> str | None:
 
 def generate_api_token(settings: ApiTokenSettings) -> str:
     secret = FileSecretStore(settings.secret_path).ensure()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(seconds=settings.expiry_sec)
     payload = {"type": "api", "iat": int(now.timestamp()), "exp": int(exp.timestamp())}
     return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)

@@ -8,8 +8,8 @@ from typing import Generic
 
 from price_platform.platform import clock
 
-from ._price_statistics import build_daily_price_points
 from ._price_event_types import PriceContext, PriceEventConfig, PriceRecordT, PriceStoreProtocol, SoldRecordT
+from ._price_statistics import build_daily_price_points
 
 
 @dataclass(frozen=True)

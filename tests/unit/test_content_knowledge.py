@@ -5,7 +5,6 @@ from pathlib import Path
 
 import price_platform.content.knowledge
 
-
 _SAMPLE_ARTICLE_DATA = {
     "id": "focal-length",
     "title": "焦点距離と画角の関係",

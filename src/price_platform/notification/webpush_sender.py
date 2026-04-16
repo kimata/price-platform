@@ -203,7 +203,7 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
                             self._delivery_status.FAILED,
                             result,
                         )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.exception("Error sending push to subscription %d: %s", subscription.id, exc)
                 failed_count += 1
                 event_id = getattr(event, "id", None)
@@ -267,7 +267,7 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
 
             logger.warning("WebPush error: %s", exc)
             return str(exc)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception("Unexpected error sending push: %s", exc)
             return str(exc)
 

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Mapping
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-
 
 _SENTENCE_SPLIT_RE = re.compile(r"[。！？\n]+")
 _WHITESPACE_RE = re.compile(r"\s+")

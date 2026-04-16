@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 import jwt
 
@@ -28,7 +29,7 @@ class SupportsMetricsConfig(Protocol):
 
 def issue_auth_token(settings: MetricsAuthSettings) -> str:
     secret = FileSecretStore(settings.jwt_secret_path).ensure()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(hours=settings.jwt_expiry_hours)
     payload = {"sub": "user", "iat": int(now.timestamp()), "exp": int(exp.timestamp())}
     return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)

@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from selenium.webdriver.remote.webdriver import WebDriver
     from my_lib.browser_manager import BrowserManager
+    from selenium.webdriver.remote.webdriver import WebDriver
 else:
     BrowserManager = object
 

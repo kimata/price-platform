@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import functools
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Self, cast
+from typing import Any, ClassVar, Self, cast
 
 from price_platform.identity import AppIdentity
 

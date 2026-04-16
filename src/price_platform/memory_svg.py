@@ -57,18 +57,18 @@ def generate_memory_usage_svg(
         return margin_top + chart_height - (value_mib / y_max) * chart_height
 
     pod_path = _build_line_path(
-        (
+
             (x_pos(sample.timestamp), y_pos(sample.pod_memory_bytes / (1024 * 1024)))
             for sample in samples
             if sample.pod_memory_bytes is not None
-        )
+
     )
     selenium_path = _build_line_path(
-        (
+
             (x_pos(sample.timestamp), y_pos(sample.selenium_memory_bytes / (1024 * 1024)))
             for sample in samples
             if sample.selenium_memory_bytes is not None
-        )
+
     )
 
     y_ticks = []

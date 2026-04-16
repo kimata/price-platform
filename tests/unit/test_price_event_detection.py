@@ -59,7 +59,7 @@ def _build_context(
         used_prices=[],
         all_time_lowest_new=all_time_lowest_new,
         period_lowest={30: None, 60: None, 90: None, 180: None, 365: None},
-        price_history={days: full_new_history for days in stable_history_by_days},
+        price_history=dict.fromkeys(stable_history_by_days, full_new_history),
         stable_price_history=stable_history_by_days,
         full_new_price_history=full_new_history,
         stable_full_new_price_history=stable_history_by_days[max(stable_history_by_days)],

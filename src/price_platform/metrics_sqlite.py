@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import collections.abc
 import pathlib
 import sqlite3
-import collections.abc
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -22,11 +22,11 @@ from ._metrics_sqlite_models import (
 )
 from .metrics_sqlite_reads import MetricsDBReadMixin
 from .metrics_sqlite_writes import MetricsDBWriteMixin
-from .sqlite_store import SQLiteStoreBase
 from .schema_registry import resolve_schema_path
+from .sqlite_store import SQLiteStoreBase
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    pass
 
 
 class MetricsDB(MetricsDBWriteMixin, MetricsDBReadMixin, SQLiteStoreBase):

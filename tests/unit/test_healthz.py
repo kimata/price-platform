@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,7 +18,7 @@ class _MetricsDbStub:
         return SimpleNamespace(
             is_running=True,
             session_id=1,
-            started_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            started_at=datetime(2024, 1, 1, tzinfo=UTC),
             processed_items=10,
             success_items=9,
             failed_items=1,
@@ -38,7 +38,7 @@ def test_check_crawler_uses_shared_definition(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr(
         price_platform.healthz.platform_time,
         "now",
-        lambda: datetime(2024, 1, 1, 1, tzinfo=timezone.utc),
+        lambda: datetime(2024, 1, 1, 1, tzinfo=UTC),
     )
 
     metrics_path = tmp_path / "metrics.db"
