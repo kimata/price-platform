@@ -4,7 +4,7 @@ variables:
     UV_LINK_MODE: copy
     UV_CACHE_DIR: .uv-cache
 
-    UV_HTTP_TIMEOUT: "60"
+    UV_HTTP_TIMEOUT: "120"
     UV_EXTRA_INDEX_URL: "http://proxy:3141/simple/"
     UV_INSECURE_HOST: "proxy"
 
