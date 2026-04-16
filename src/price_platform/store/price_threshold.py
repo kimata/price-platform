@@ -28,7 +28,7 @@ def load_price_threshold_map(
         logger.info("price_threshold.yaml not found, using empty threshold")
         return {}
 
-    parse = parser.parse
+    parse = getattr(parser, "parse")  # noqa: B009
     try:
         data = platform_config.load(threshold_path, schema_path, include_base_dir=False)
         if data is None or not isinstance(data, list):

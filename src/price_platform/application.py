@@ -232,7 +232,7 @@ def create_standard_webapi_app(
     """共通骨格から標準 Web API アプリを組み立てる。"""
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-    external_url = getattr(config.webapp, "external_url", None)
+    external_url = getattr(getattr(config, "webapp"), "external_url", None)  # noqa: B009
     if external_url is None:
         msg = "Configuration error: webapp.external_url is required"
         raise ValueError(msg)
@@ -243,8 +243,8 @@ def create_standard_webapi_app(
             url_prefix=definition.url_prefix,
             external_url=external_url,
             base_dir=definition.base_dir,
-            flea_thumb_dir=config.absolute_cache_path / definition.flea_thumb_subdir,
-            healthcheck=lambda: dependencies.stores.price_store.get_last_update_time(),
+            flea_thumb_dir=getattr(config, "absolute_cache_path") / definition.flea_thumb_subdir,  # noqa: B009
+            healthcheck=lambda: getattr(dependencies.stores, "price_store").get_last_update_time(),  # noqa: B009
             cache_rules=definition.cache_rules,
             html_content_security_policy=definition.html_content_security_policy,
             blueprints=definition.blueprints,

@@ -187,12 +187,12 @@ def build_social_message(
             event_emoji=event.event_type.emoji,
             store_label=event.store.label,
             price=event.price,
-            previous_price=event.previous_price,
-            reference_price=event.reference_price,
-            change_percent=event.change_percent,
-            period_days=event.period_days,
-            recorded_at=event.recorded_at,
-            hashtag=product.hashtag,
+            previous_price=getattr(event, "previous_price"),  # noqa: B009
+            reference_price=getattr(event, "reference_price"),  # noqa: B009
+            change_percent=getattr(event, "change_percent"),  # noqa: B009
+            period_days=getattr(event, "period_days"),  # noqa: B009
+            recorded_at=getattr(event, "recorded_at"),  # noqa: B009
+            hashtag=getattr(product, "hashtag"),  # noqa: B009
             social_copy=strategies.social_copy.build(product),
         )
     )

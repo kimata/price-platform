@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 
 class ProposalKind(StrEnum):
@@ -19,7 +20,7 @@ class ProposalStatus(StrEnum):
     REJECTED = "rejected"
 
 
-def serialize_json_payload(payload: dict[str, object]) -> str:
+def serialize_json_payload(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
 
@@ -69,9 +70,9 @@ class KeywordProposal:
     product_id: str
     product_name: str
     kind: ProposalKind
-    payload: dict[str, object]
+    payload: dict[str, Any]
     metrics: dict[str, float | int]
-    evidence: dict[str, object]
+    evidence: dict[str, Any]
     score: float
     analysis_window: AnalysisWindow = field(default_factory=AnalysisWindow)
     status: ProposalStatus = ProposalStatus.PENDING

@@ -5,6 +5,7 @@ import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from price_platform.platform import clock
 from price_platform.schema_registry import resolve_schema_path
@@ -32,7 +33,7 @@ class KeywordLearningStore(SQLiteStoreBase):
         self,
         *,
         context: FilterObservationContext,
-        result: FilterResult[object],
+        result: FilterResult[Any],
         title_normalizer: Callable[[str], str],
     ) -> None:
         with self.connection() as conn:
@@ -273,8 +274,8 @@ class KeywordLearningStore(SQLiteStoreBase):
             )
             conn.commit()
 
-    def approved_overrides(self, *, project: str) -> dict[str, dict[str, object]]:
-        overrides: dict[str, dict[str, object]] = {}
+    def approved_overrides(self, *, project: str) -> dict[str, dict[str, Any]]:
+        overrides: dict[str, dict[str, Any]] = {}
         for proposal in self.list_proposals(project=project, status=ProposalStatus.APPROVED):
             product_override = overrides.setdefault(proposal.product_id, {})
             if proposal.kind is ProposalKind.RELAX_REQUIRED_KEYWORDS:
@@ -283,19 +284,17 @@ class KeywordLearningStore(SQLiteStoreBase):
                 if anchor_keywords:
                     product_override["anchor_keywords"] = anchor_keywords
             elif proposal.kind is ProposalKind.ADD_NG_WORDS:
-                product_override.setdefault("add_ng_words", [])
-                existing = list(product_override["add_ng_words"])
+                existing: list[str] = list(product_override.get("add_ng_words", []))
                 for token in proposal.payload.get("add_ng_words", []):
                     if token not in existing:
                         existing.append(token)
                 product_override["add_ng_words"] = existing
             elif proposal.kind is ProposalKind.ADD_EXCLUDE_PRODUCT_NAMES:
-                product_override.setdefault("add_exclude_product_names", [])
-                existing = list(product_override["add_exclude_product_names"])
+                existing_names: list[str] = list(product_override.get("add_exclude_product_names", []))
                 for name in proposal.payload.get("add_exclude_product_names", []):
-                    if name not in existing:
-                        existing.append(name)
-                product_override["add_exclude_product_names"] = existing
+                    if name not in existing_names:
+                        existing_names.append(name)
+                product_override["add_exclude_product_names"] = existing_names
         return overrides
 
     @staticmethod
