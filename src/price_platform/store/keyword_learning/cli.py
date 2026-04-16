@@ -131,20 +131,20 @@ def main(
         return 0
 
     if args.command == "show-proposal":
-        proposal = store.get_proposal(args.proposal_id)
-        if proposal is None:
+        target_proposal = store.get_proposal(args.proposal_id)
+        if target_proposal is None:
             raise SystemExit(f"proposal not found: {args.proposal_id}")
         print(json.dumps(
             {
-                "id": proposal.proposal_id,
-                "project": proposal.project,
-                "product_id": proposal.product_id,
-                "kind": proposal.kind.value,
-                "status": proposal.status.value,
-                "payload": proposal.payload,
-                "metrics": proposal.metrics,
-                "evidence": proposal.evidence,
-                "score": proposal.score,
+                "id": target_proposal.proposal_id,
+                "project": target_proposal.project,
+                "product_id": target_proposal.product_id,
+                "kind": target_proposal.kind.value,
+                "status": target_proposal.status.value,
+                "payload": target_proposal.payload,
+                "metrics": target_proposal.metrics,
+                "evidence": target_proposal.evidence,
+                "score": target_proposal.score,
             },
             ensure_ascii=False,
             indent=2,
