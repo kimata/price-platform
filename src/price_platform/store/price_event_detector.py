@@ -106,8 +106,12 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
         self,
         product_id: str,
         current_prices: list[PriceRecordT],
+        *,
+        selection_key: str | None = None,
     ) -> PriceContext[PriceRecordT, SoldRecordT]:
-        return PriceContextBuilder(self.price_store, self.config).build(product_id, current_prices)
+        return PriceContextBuilder(self.price_store, self.config).build(
+            product_id, current_prices, selection_key=selection_key
+        )
 
     def _detect_events(
         self,
@@ -213,11 +217,13 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
         self,
         product_id: str,
         current_prices: list[PriceRecordT],
+        *,
+        selection_key: str | None = None,
     ) -> list[PriceEventT]:
         if not current_prices:
             return []
 
-        ctx = self._build_price_context(product_id, current_prices)
+        ctx = self._build_price_context(product_id, current_prices, selection_key=selection_key)
         now = clock.now()
         detected = self._detect_events(ctx, now)
         return apply_event_suppression(
@@ -231,14 +237,39 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
         self,
         product_id: str,
         current_prices: list[PriceRecordT],
+        *,
+        selection_key: str | None = None,
     ) -> list[PriceEventT]:
         if not current_prices:
             return []
 
-        ctx = self._build_price_context(product_id, current_prices)
+        ctx = self._build_price_context(product_id, current_prices, selection_key=selection_key)
         now = clock.now()
         return self._detect_events(ctx, now)
 
+    def _group_by_variant(
+        self, prices: list[PriceRecordT]
+    ) -> dict[str | None, list[PriceRecordT]]:
+        """Group prices by variant key extracted via config.variant_key_extractor."""
+        groups: dict[str | None, list[PriceRecordT]] = {}
+        for price in prices:
+            key = self.config.variant_key_extractor(price)
+            groups.setdefault(key, []).append(price)
+        return groups
+
     def detect_events(self, product_id: str) -> list[PriceEventT]:
         current_prices = self.price_store.get_current_prices(product_id)
-        return self.detect_events_for_product(product_id, current_prices)
+
+        variant_groups = self._group_by_variant(current_prices)
+        has_variants = len(variant_groups) > 1 or next(iter(variant_groups), None) is not None
+
+        if not has_variants:
+            return self.detect_events_for_product(product_id, current_prices)
+
+        all_events: list[PriceEventT] = []
+        for variant_key, variant_prices in variant_groups.items():
+            events = self.detect_events_for_product(
+                product_id, variant_prices, selection_key=variant_key
+            )
+            all_events.extend(events)
+        return all_events

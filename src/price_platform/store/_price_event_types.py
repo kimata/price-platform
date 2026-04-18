@@ -35,10 +35,18 @@ class SoldRecordProtocol(Protocol):
 
 
 class PriceStoreProtocol(Protocol[PriceRecordT, SoldRecordT]):
-    def get_price_history(self, product_id: str, days: int) -> list[PriceRecordT]: ...
-    def get_lowest_price(self, product_id: str, *, is_used: bool) -> PriceRecordT | None: ...
-    def get_sold_records(self, product_id: str, *, limit: int = 20) -> list[SoldRecordT]: ...
-    def get_current_prices(self, product_id: str) -> list[PriceRecordT]: ...
+    def get_price_history(
+        self, product_id: str, days: int, *, selection_key: str | None = None
+    ) -> list[PriceRecordT]: ...
+    def get_lowest_price(
+        self, product_id: str, *, is_used: bool, selection_key: str | None = None
+    ) -> PriceRecordT | None: ...
+    def get_sold_records(
+        self, product_id: str, *, limit: int = 20, selection_key: str | None = None
+    ) -> list[SoldRecordT]: ...
+    def get_current_prices(
+        self, product_id: str, *, selection_key: str | None = None
+    ) -> list[PriceRecordT]: ...
 
 
 class PriceEventStoreProtocol(Protocol[PriceEventT]):
@@ -166,10 +174,15 @@ def default_canonical_variant_key_builder(
     return product_id
 
 
+def _no_variant_key(_record: Any) -> None:
+    return None
+
+
 @dataclass
 class PriceEventConfig:
     """Configuration for price event detection."""
 
+    variant_key_extractor: Callable[[Any], str | None] = _no_variant_key
     canonical_variant_key_builder: Callable[[str, Sequence[PriceRecordProtocol[Any]]], str | None] = (
         default_canonical_variant_key_builder
     )

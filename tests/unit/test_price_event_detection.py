@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import Never
+from typing import Any, Never
 
 from price_platform.store._price_event_rules import (
     check_price_drop,
@@ -12,13 +12,17 @@ from price_platform.store._price_event_rules import (
 )
 from price_platform.store._price_event_types import PriceContext, PriceEventConfig, PriceHistoryPoint
 from price_platform.store._price_statistics import build_daily_price_points, is_returning_from_spike
-from price_platform.store.price_event_detector import KeywordEventFactory
+from price_platform.store.price_event_detector import KeywordEventFactory, PriceEventDetector
 
 
 class DummyEventType(StrEnum):
     ALL_TIME_LOW = "ALL_TIME_LOW"
     STATISTICAL_LOW = "STATISTICAL_LOW"
     PERIOD_LOW_30 = "PERIOD_LOW_30"
+    PERIOD_LOW_60 = "PERIOD_LOW_60"
+    PERIOD_LOW_90 = "PERIOD_LOW_90"
+    PERIOD_LOW_180 = "PERIOD_LOW_180"
+    PERIOD_LOW_365 = "PERIOD_LOW_365"
     PRICE_DROP = "PRICE_DROP"
     PRICE_RECOVERY = "PRICE_RECOVERY"
     FLEA_BARGAIN = "FLEA_BARGAIN"
@@ -41,6 +45,7 @@ class DummyPriceRecord:
     is_used: bool = False
     store: str = "shop"
     url: str | None = "https://example.com/item"
+    variant_id: str | None = None
 
 
 def _build_context(
@@ -266,3 +271,203 @@ def test_keyword_event_factory_passes_through_var_keyword() -> None:
 
     assert event.product_id == "product-1"
     assert event.price == 70
+
+
+# --- Variant-aware detection tests ---
+
+
+@dataclass(frozen=True)
+class DummyDetectedEventFull:
+    event_type: str
+    product_id: str
+    store: str
+    price: int
+    url: str | None
+    recorded_at: datetime
+    id: int | None = None
+    priority: int = 0
+    variant_id: str | None = None
+
+
+class InMemoryPriceStore:
+    """selection_key 対応のインメモリ PriceStore."""
+
+    def __init__(self, prices: list[DummyPriceRecord], sold: list[Any] | None = None) -> None:
+        self._prices = prices
+        self._sold = sold or []
+
+    def _filter(self, records: list[DummyPriceRecord], product_id: str, selection_key: str | None) -> list[DummyPriceRecord]:
+        result = [p for p in records if getattr(p, "product_id", product_id) == product_id]
+        if selection_key is not None:
+            result = [p for p in result if p.variant_id == selection_key]
+        return result
+
+    def get_current_prices(self, product_id: str, *, selection_key: str | None = None) -> list[DummyPriceRecord]:
+        current: dict[tuple[str | None, str, bool], DummyPriceRecord] = {}
+        for p in self._filter(self._prices, product_id, selection_key):
+            key = (p.variant_id, p.store, p.is_used)
+            if key not in current or p.recorded_at > current[key].recorded_at:
+                current[key] = p
+        return list(current.values())
+
+    def get_price_history(self, product_id: str, days: int, *, selection_key: str | None = None) -> list[DummyPriceRecord]:
+        from price_platform.platform import clock
+
+        cutoff = clock.now() - timedelta(days=days)
+        return [
+            p for p in self._filter(self._prices, product_id, selection_key)
+            if p.recorded_at >= cutoff
+        ]
+
+    def get_lowest_price(self, product_id: str, *, is_used: bool, selection_key: str | None = None) -> DummyPriceRecord | None:
+        filtered = [
+            p for p in self._filter(self._prices, product_id, selection_key)
+            if p.is_used == is_used
+        ]
+        return min(filtered, key=lambda p: p.price) if filtered else None
+
+    def get_sold_records(self, product_id: str, *, limit: int = 20, selection_key: str | None = None) -> list[Any]:
+        return self._sold[:limit]
+
+
+class InMemoryEventStore:
+    """最小限のインメモリ PriceEventStore."""
+
+    def __init__(self) -> None:
+        self._events: list[Any] = []
+        self._next_id = 1
+
+    def has_recent_similar_price_event(
+        self, product_id: str, store: Any, price: int, days: int = 14, tolerance: int = 100
+    ) -> bool:
+        return False
+
+    def get_recent_event_for_product(self, product_id: str, hours: int) -> Any | None:
+        return None
+
+    def save_event(self, event: Any) -> int:
+        event_id = self._next_id
+        self._next_id += 1
+        self._events.append(replace(event, id=event_id))
+        return event_id
+
+    def suppress_event(self, event_id: int, superseded_by: int) -> None:
+        pass
+
+
+def _make_variant_detector(
+    prices: list[DummyPriceRecord],
+    *,
+    with_variant_extractor: bool = True,
+) -> PriceEventDetector[DummyDetectedEventFull, DummyPriceRecord, Never]:
+    """バリアント対応の PriceEventDetector を構築する."""
+    config = PriceEventConfig(
+        variant_key_extractor=(lambda r: r.variant_id) if with_variant_extractor else (lambda _: None),
+        all_time_low_min_days=5,
+    )
+
+    def event_factory(**kwargs: Any) -> DummyDetectedEventFull:
+        accepted = {k: v for k, v in kwargs.items() if k in DummyDetectedEventFull.__dataclass_fields__}
+        return DummyDetectedEventFull(**accepted)
+
+    return PriceEventDetector(
+        price_store=InMemoryPriceStore(prices),
+        event_store=InMemoryEventStore(),
+        event_types=DummyEventTypes,
+        period_event_map={
+            30: DummyEventType.PERIOD_LOW_30,
+            60: DummyEventType.PERIOD_LOW_60,
+            90: DummyEventType.PERIOD_LOW_90,
+            180: DummyEventType.PERIOD_LOW_180,
+            365: DummyEventType.PERIOD_LOW_365,
+        },
+        flea_market_stores=(),
+        event_factory=event_factory,
+        event_extra_fields=lambda record: {"variant_id": record.variant_id},
+        config=config,
+    )
+
+
+def test_detect_events_separates_variants() -> None:
+    """バリアント別にイベント検出が分離されることを確認する.
+
+    variant_A は価格変動なし (100円固定) → イベントなし
+    variant_B は大幅な値下げ (100円 → 50円) → STATISTICAL_LOW イベント検出
+    """
+    from price_platform.platform import clock
+
+    now = clock.now()
+
+    prices: list[DummyPriceRecord] = []
+    # variant_A: 100円で安定 (120日分) → 統計的にも安定
+    for day in range(120):
+        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="A"))
+    prices.append(DummyPriceRecord(price=100, recorded_at=now, variant_id="A"))
+
+    # variant_B: 100円で安定 (120日分) → 最新のみ50円に値下げ
+    for day in range(120):
+        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B"))
+    prices.append(DummyPriceRecord(price=50, recorded_at=now, variant_id="B"))
+
+    detector = _make_variant_detector(prices, with_variant_extractor=True)
+    events = detector.detect_events("product-1")
+
+    # variant_B のイベントのみ検出される
+    assert events
+    for event in events:
+        assert event.variant_id == "B", f"variant_A のイベントが誤って検出された: {event}"
+
+
+def test_detect_events_without_variant_extractor_mixes_data() -> None:
+    """variant_key_extractor 未設定時は全バリアントが混在する（従来の動作）."""
+    from price_platform.platform import clock
+
+    now = clock.now()
+
+    prices: list[DummyPriceRecord] = []
+    for day in range(120):
+        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="A"))
+    prices.append(DummyPriceRecord(price=100, recorded_at=now, variant_id="A"))
+
+    for day in range(120):
+        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B"))
+    prices.append(DummyPriceRecord(price=50, recorded_at=now, variant_id="B"))
+
+    detector = _make_variant_detector(prices, with_variant_extractor=False)
+    events = detector.detect_events("product-1")
+
+    # extractor 未設定: 全バリアント混在で検出される
+    # cheapest_new は variant_B の 50円になるが、variant_id 区別なくイベント生成
+    # 例外が起きないことを確認（イベントが出るか出ないかはルール次第）
+    assert isinstance(events, list)
+
+
+def test_detect_events_variant_isolation_prevents_cross_contamination() -> None:
+    """バリアント A の履歴がバリアント B の検出コンテキストに混入しないことを確認.
+
+    variant_A: 20円で安定（安い） → variant_B の基準に影響してはならない
+    variant_B: 100円で安定 → 最新50円に値下げ → STATISTICAL_LOW 検出
+    混入があると variant_B の履歴に20円が含まれ、50円の統計的異常度が下がる。
+    """
+    from price_platform.platform import clock
+
+    now = clock.now()
+
+    prices: list[DummyPriceRecord] = []
+    # variant_A: 20円で安定 (120日分)
+    for day in range(120):
+        prices.append(DummyPriceRecord(price=20, recorded_at=now - timedelta(days=day + 1), variant_id="A"))
+    prices.append(DummyPriceRecord(price=20, recorded_at=now, variant_id="A"))
+
+    # variant_B: 100円で安定 (120日分) → 最新は50円
+    for day in range(120):
+        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B"))
+    prices.append(DummyPriceRecord(price=50, recorded_at=now, variant_id="B"))
+
+    detector = _make_variant_detector(prices, with_variant_extractor=True)
+    events = detector.detect_events("product-1")
+
+    # variant_B のイベントが検出される（variant_A の20円履歴に汚染されていない）
+    variant_b_events = [e for e in events if e.variant_id == "B"]
+    assert variant_b_events, "variant_B の統計的異常が検出されるべき"
+    assert variant_b_events[0].price == 50

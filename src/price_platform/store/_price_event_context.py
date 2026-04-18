@@ -21,6 +21,8 @@ class PriceContextBuilder(Generic[PriceRecordT, SoldRecordT]):
         self,
         product_id: str,
         current_prices: list[PriceRecordT],
+        *,
+        selection_key: str | None = None,
     ) -> PriceContext[PriceRecordT, SoldRecordT]:
         new_prices = [p for p in current_prices if not p.is_used]
         used_prices = [p for p in current_prices if p.is_used]
@@ -34,7 +36,9 @@ class PriceContextBuilder(Generic[PriceRecordT, SoldRecordT]):
             ),
         }
         history_days.update(self.config.period_low_days)
-        full_history = self.price_store.get_price_history(product_id, days=max(history_days))
+        full_history = self.price_store.get_price_history(
+            product_id, days=max(history_days), selection_key=selection_key
+        )
 
         now = clock.now()
         price_history: dict[int, list[PriceRecordT]] = {}
@@ -53,14 +57,18 @@ class PriceContextBuilder(Generic[PriceRecordT, SoldRecordT]):
             mode=self.config.daily_price_mode,
         )
 
-        all_time_lowest_new = self.price_store.get_lowest_price(product_id, is_used=False)
+        all_time_lowest_new = self.price_store.get_lowest_price(
+            product_id, is_used=False, selection_key=selection_key
+        )
         period_lowest: dict[int, PriceRecordT | None] = {}
         for days in self.config.period_low_days:
             history = price_history.get(days, [])
             new_history = [p for p in history if not p.is_used]
             period_lowest[days] = min(new_history, key=lambda p: p.price) if new_history else None
 
-        sold_records = self.price_store.get_sold_records(product_id, limit=20)
+        sold_records = self.price_store.get_sold_records(
+            product_id, limit=20, selection_key=selection_key
+        )
         return PriceContext(
             product_id=product_id,
             canonical_variant_key=self.config.canonical_variant_key_builder(product_id, current_prices),
