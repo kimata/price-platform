@@ -1188,7 +1188,7 @@ wheels = [
 [[package]]
 name = "my-lib"
 version = "0.2.0"
-source = { git = "https://github.com/kimata/my-py-lib?rev=b0e57d57d0d133752a99f3efcfaf9d7268e18272#b0e57d57d0d133752a99f3efcfaf9d7268e18272" }
+source = { git = "https://github.com/kimata/my-py-lib?rev=26f48792b8506583e5acb3311ed1a5213cb4553c#26f48792b8506583e5acb3311ed1a5213cb4553c" }
 dependencies = [
     { name = "coloredlogs" },
     { name = "dacite" },
@@ -1353,7 +1353,7 @@ requires-dist = [
     { name = "docopt-ng", specifier = ">=0.9.0" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "flask-cors", specifier = ">=6.0.0" },
-    { name = "my-lib", git = "https://github.com/kimata/my-py-lib?rev=b0e57d57d0d133752a99f3efcfaf9d7268e18272" },
+    { name = "my-lib", git = "https://github.com/kimata/my-py-lib?rev=26f48792b8506583e5acb3311ed1a5213cb4553c" },
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "selenium", specifier = ">=4.0.0" },
