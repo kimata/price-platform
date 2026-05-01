@@ -127,7 +127,7 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
             base_url = self._external_url.rstrip("/")
             encoded_id = urllib.parse.quote(product_id, safe="")
             url = build_detail_url(base_url, product_id, selection_key)
-            icon_url = f"{base_url}/api/products/ogp-image/{encoded_id}"
+            icon_url = f"{base_url}/api/products/icon/{encoded_id}"
 
         if icon_url is None:
             icon_url = self._fallback_icon_url_getter(product)
