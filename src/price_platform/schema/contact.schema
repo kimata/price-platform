@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "introduction": { "type": "string" },
+    "form_url": { "type": "string", "format": "uri" },
+    "email": { "type": "string" },
+    "twitter": { "type": "string" },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" }
+        },
+        "required": ["title", "description"]
+      }
+    },
+    "response_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["title", "description", "introduction"]
+}
