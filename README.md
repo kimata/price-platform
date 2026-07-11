@@ -32,6 +32,10 @@
 ### 相場分析 (`market_analysis`)
 - 価格集計値 (MarketStats) から製品詳細ページ向けの相場分析文章 (MarketAnalysis) を生成する純粋ロジック
 
+## ドキュメント
+
+- [アーキテクチャ](doc/architecture.md) — パッケージ構成と主要サブシステムの図解
+
 ## セットアップ
 
 ```bash

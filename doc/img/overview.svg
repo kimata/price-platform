@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b949e"/>
+    </marker>
+  </defs>
+  <rect width="960" height="600" fill="#ffffff"/>
+
+  <!-- 利用側アプリ -->
+  <g>
+    <rect x="150" y="20" width="180" height="52" rx="8" fill="#ffffff" stroke="#57606a" stroke-width="1.3"/>
+    <text x="240" y="42" text-anchor="middle" fill="#1f2328" font-weight="700">lens-fleama</text>
+    <text x="240" y="60" text-anchor="middle" fill="#57606a" font-size="11">カメラレンズ</text>
+    <rect x="390" y="20" width="180" height="52" rx="8" fill="#ffffff" stroke="#57606a" stroke-width="1.3"/>
+    <text x="480" y="42" text-anchor="middle" fill="#1f2328" font-weight="700">pt-fleama</text>
+    <text x="480" y="60" text-anchor="middle" fill="#57606a" font-size="11">電動工具</text>
+    <rect x="630" y="20" width="180" height="52" rx="8" fill="#ffffff" stroke="#57606a" stroke-width="1.3"/>
+    <text x="720" y="42" text-anchor="middle" fill="#1f2328" font-weight="700">hp-fleama</text>
+    <text x="720" y="60" text-anchor="middle" fill="#57606a" font-size="11">ヘッドホン・イヤホン</text>
+  </g>
+  <line x1="240" y1="72" x2="240" y2="108" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <line x1="480" y1="72" x2="480" y2="108" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <line x1="720" y1="72" x2="720" y2="108" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <text x="850" y="95" text-anchor="end" fill="#57606a" font-size="11">pyproject.toml で GitHub コミットハッシュ固定</text>
+
+  <!-- price-platform 本体 -->
+  <rect x="30" y="112" width="900" height="368" rx="10" fill="#f8f9fa" stroke="#2a78d6" stroke-width="1.6"/>
+  <text x="50" y="138" fill="#1f2328" font-weight="700" font-size="15">price-platform</text>
+  <text x="910" y="138" text-anchor="end" fill="#57606a" font-size="11">src 約 15,000 行 / Python 3.12+</text>
+
+  <!-- 収集・検出 -->
+  <rect x="50" y="152" width="280" height="150" rx="8" fill="#e7f0fb" stroke="#2a78d6"/>
+  <text x="64" y="174" fill="#1c5cab" font-weight="700">store/ — 収集・価格イベント検出</text>
+  <text x="64" y="196" fill="#1f2328" font-size="12">price_event_detector / _rules / _context</text>
+  <text x="64" y="214" fill="#1f2328" font-size="12">_suppression / price_event_store</text>
+  <text x="64" y="232" fill="#1f2328" font-size="12">fetcher_common(フェッチャ共通基盤)</text>
+  <text x="64" y="250" fill="#1f2328" font-size="12">price_quarantine(異常価格の検疫)</text>
+  <text x="64" y="268" fill="#1f2328" font-size="12">keyword_learning/(絞込語の学習)</text>
+  <text x="64" y="286" fill="#1f2328" font-size="12">webdriver_pool / scrape_retry / thumbs</text>
+
+  <!-- 通知 -->
+  <rect x="346" y="152" width="280" height="150" rx="8" fill="#fdeee5" stroke="#eb6834"/>
+  <text x="360" y="174" fill="#b34a1d" font-weight="700">notification/ — 通知配信</text>
+  <text x="360" y="196" fill="#1f2328" font-size="12">manager(チャネル振り分け)</text>
+  <text x="360" y="214" fill="#1f2328" font-size="12">notification_store + twitter_poster</text>
+  <text x="360" y="232" fill="#1f2328" font-size="12">webpush_store / sender / dispatcher</text>
+  <text x="360" y="250" fill="#1f2328" font-size="12">status(状態 payload 構築)</text>
+  <text x="360" y="268" fill="#1f2328" font-size="12">_notification_*_repository(SQL 分離)</text>
+
+  <!-- 計測 -->
+  <rect x="642" y="152" width="272" height="150" rx="8" fill="#e2f6ee" stroke="#1baf7a"/>
+  <text x="656" y="174" fill="#0e7a54" font-weight="700">metrics/ — 計測</text>
+  <text x="656" y="196" fill="#1f2328" font-size="12">server/(クロール実績: db, reads,</text>
+  <text x="668" y="212" fill="#1f2328" font-size="12">writes, models, migrations)</text>
+  <text x="656" y="232" fill="#1f2328" font-size="12">client/(Web Vitals・箱ひげ・SNS 流入)</text>
+  <text x="656" y="252" fill="#1f2328" font-size="12">render/(SVG 描画: boxplot, memory)</text>
+  <text x="656" y="276" fill="#57606a" font-size="11">+ managers/metrics_manager(セッション記録)</text>
+
+  <!-- Web / 認証 / コンテンツ -->
+  <rect x="50" y="318" width="280" height="146" rx="8" fill="#edeafa" stroke="#4a3aa7"/>
+  <text x="64" y="340" fill="#3b2e86" font-weight="700">webapp/ + auth/ — Web 基盤</text>
+  <text x="64" y="362" fill="#1f2328" font-size="12">app_factory / dependencies / headers</text>
+  <text x="64" y="380" fill="#1f2328" font-size="12">cors / request_context / _seo_routes</text>
+  <text x="64" y="398" fill="#1f2328" font-size="12">auth: api_token(JWT) / metrics_auth</text>
+  <text x="64" y="416" fill="#1f2328" font-size="12">rate_limiter / password_hash / secrets</text>
+  <text x="64" y="440" fill="#57606a" font-size="11">application.py が骨格を組み立てる</text>
+
+  <!-- コンテンツ / 分析 -->
+  <rect x="346" y="318" width="280" height="146" rx="8" fill="#fdf3d7" stroke="#c98500"/>
+  <text x="360" y="340" fill="#8a5a00" font-weight="700">content/ + 分析</text>
+  <text x="360" y="362" fill="#1f2328" font-size="12">about / contact / editorial / knowledge</text>
+  <text x="360" y="380" fill="#1f2328" font-size="12">(YAML → frozen dataclass)</text>
+  <text x="360" y="402" fill="#1f2328" font-size="12">market_analysis(相場分析文の生成)</text>
+  <text x="360" y="420" fill="#1f2328" font-size="12">social_posts(SNS 投稿文の組み立て)</text>
+
+  <!-- 基盤 -->
+  <rect x="642" y="318" width="272" height="146" rx="8" fill="#f3f4f6" stroke="#8b949e"/>
+  <text x="656" y="340" fill="#414a55" font-weight="700">共有基盤</text>
+  <text x="656" y="362" fill="#1f2328" font-size="12">config/(設定ロード・型付きモデル)</text>
+  <text x="656" y="380" fill="#1f2328" font-size="12">sqlite_store(基底 + マイグレーション)</text>
+  <text x="656" y="398" fill="#1f2328" font-size="12">schema/(SQLite 7 種 + コンテンツ検証 3 種)</text>
+  <text x="656" y="416" fill="#1f2328" font-size="12">platform/(my-lib への facade)</text>
+  <text x="656" y="434" fill="#1f2328" font-size="12">healthz / identity / testing/(契約)</text>
+
+  <!-- 下位依存 -->
+  <line x1="300" y1="480" x2="300" y2="514" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <line x1="660" y1="480" x2="660" y2="514" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <rect x="140" y="518" width="320" height="56" rx="8" fill="#ffffff" stroke="#57606a" stroke-width="1.3"/>
+  <text x="300" y="541" text-anchor="middle" fill="#1f2328" font-weight="700">my-py-lib (my_lib)</text>
+  <text x="300" y="560" text-anchor="middle" fill="#57606a" font-size="11">platform/ facade 経由でのみ参照(境界を限定)</text>
+  <rect x="500" y="518" width="320" height="56" rx="8" fill="#ffffff" stroke="#57606a" stroke-width="1.3"/>
+  <text x="660" y="541" text-anchor="middle" fill="#1f2328" font-weight="700">SQLite</text>
+  <text x="660" y="560" text-anchor="middle" fill="#57606a" font-size="11">価格イベント / 通知 / 購読 / 計測 / 検疫 / 学習</text>
+</svg>

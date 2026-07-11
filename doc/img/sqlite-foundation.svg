@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b949e"/>
+    </marker>
+  </defs>
+  <rect width="960" height="560" fill="#ffffff"/>
+  <text x="30" y="34" fill="#1f2328" font-weight="700" font-size="15">SQLite 永続化基盤(sqlite_store / schema_registry / schema/)</text>
+
+  <!-- schema registry -->
+  <rect x="30" y="56" width="280" height="150" rx="8" fill="#fdf3d7" stroke="#c98500" stroke-width="1.4"/>
+  <text x="46" y="80" fill="#8a5a00" font-weight="700">schema_registry + schema/</text>
+  <text x="46" y="102" fill="#1f2328" font-size="12">resolve_schema_path() で同梱スキーマを解決</text>
+  <g fill="#57606a" font-size="11">
+    <text x="46" y="122">sqlite_price_events / sqlite_notification</text>
+    <text x="46" y="138">sqlite_webpush / sqlite_metrics</text>
+    <text x="46" y="154">sqlite_client_metrics / sqlite_price_quarantine</text>
+    <text x="46" y="170">sqlite_keyword_learning + コンテンツ検証 3 種</text>
+  </g>
+  <text x="46" y="194" fill="#57606a" font-size="11">スキーマはライブラリが所有(アプリは持たない)</text>
+
+  <line x1="310" y1="130" x2="358" y2="130" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- bootstrapper -->
+  <rect x="362" y="56" width="290" height="150" rx="8" fill="#e7f0fb" stroke="#2a78d6" stroke-width="1.4"/>
+  <text x="378" y="80" fill="#1c5cab" font-weight="700">SQLiteBootstrapper.ensure_ready()</text>
+  <text x="378" y="104" fill="#1f2328" font-size="12">① スキーマ適用(CREATE IF NOT EXISTS)</text>
+  <text x="378" y="124" fill="#1f2328" font-size="12">② MigrationRunner が未適用の</text>
+  <text x="392" y="140" fill="#1f2328" font-size="12">Migration を適用(schema_migrations 追跡)</text>
+  <text x="378" y="160" fill="#1f2328" font-size="12">③ schema_metadata に名前と SHA-256 を記録</text>
+  <text x="378" y="182" fill="#57606a" font-size="11">既存 DB への列追加はマイグレーションで収束</text>
+
+  <line x1="652" y1="130" x2="700" y2="130" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- base -->
+  <rect x="704" y="56" width="226" height="150" rx="8" fill="#f3f4f6" stroke="#8b949e" stroke-width="1.4"/>
+  <text x="720" y="80" fill="#414a55" font-weight="700">SQLiteStoreBase</text>
+  <text x="720" y="104" fill="#1f2328" font-size="12">connection() コンテキスト</text>
+  <text x="720" y="122" fill="#1f2328" font-size="12">(locking_mode 指定可)</text>
+  <text x="720" y="144" fill="#1f2328" font-size="12">全ストアの共通基底クラス</text>
+
+  <!-- subclasses -->
+  <line x1="480" y1="206" x2="480" y2="240" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <text x="500" y="230" fill="#57606a" font-size="11">継承(スキーマ名とマイグレーションを宣言するだけ)</text>
+
+  <g font-size="12">
+    <rect x="30" y="244" width="290" height="64" rx="8" fill="#ffffff" stroke="#2a78d6"/>
+    <text x="46" y="268" fill="#1c5cab" font-weight="700">BasePriceEventStore</text>
+    <text x="46" y="288" fill="#1f2328">価格イベント(selection_key 列は構成可能)</text>
+
+    <rect x="336" y="244" width="290" height="64" rx="8" fill="#ffffff" stroke="#eb6834"/>
+    <text x="352" y="268" fill="#b34a1d" font-weight="700">NotificationStore / BaseWebPushStore</text>
+    <text x="352" y="288" fill="#1f2328">通知キュー / Push 購読・配信ログ</text>
+
+    <rect x="642" y="244" width="288" height="64" rx="8" fill="#ffffff" stroke="#1baf7a"/>
+    <text x="658" y="268" fill="#0e7a54" font-weight="700">MetricsDB / ClientMetricsDB</text>
+    <text x="658" y="288" fill="#1f2328">metrics/server/db, metrics/client/db</text>
+
+    <rect x="30" y="320" width="290" height="64" rx="8" fill="#ffffff" stroke="#4a3aa7"/>
+    <text x="46" y="344" fill="#3b2e86" font-weight="700">PriceQuarantineStore</text>
+    <text x="46" y="364" fill="#1f2328">異常価格の検疫ログ(理由付き)</text>
+
+    <rect x="336" y="320" width="290" height="64" rx="8" fill="#ffffff" stroke="#8b949e"/>
+    <text x="352" y="344" fill="#414a55" font-weight="700">keyword_learning/store</text>
+    <text x="352" y="364" fill="#1f2328">絞込語学習の観測・提案</text>
+  </g>
+
+  <rect x="642" y="320" width="288" height="64" rx="8" fill="#f8f9fa" stroke="#8b949e" stroke-dasharray="4 3"/>
+  <text x="658" y="344" fill="#414a55" font-weight="700">アプリ側ストア</text>
+  <text x="658" y="364" fill="#1f2328" font-size="12">価格 DB(DuckDB 等)はアプリが所有</text>
+
+  <!-- 設計メモ -->
+  <rect x="30" y="412" width="900" height="118" rx="8" fill="#f8f9fa" stroke="#d0d4da"/>
+  <text x="46" y="436" fill="#1f2328" font-weight="700">設計ポイント</text>
+  <text x="46" y="460" fill="#1f2328" font-size="12">・スキーマ進化 = 「schema/ の CREATE 文更新(新規 DB 用)」+「Migration 追加(既存 DB 用)」のペアで表現する</text>
+  <text x="46" y="480" fill="#1f2328" font-size="12">・Migration は名前で一度だけ適用され、適用後にメタデータを記録する(実態とメタデータの乖離を防ぐ)</text>
+  <text x="46" y="500" fill="#1f2328" font-size="12">・列名など SQL に埋め込む識別子はクラス定数に限定し、値はすべてプレースホルダでバインドする</text>
+  <text x="46" y="520" fill="#1f2328" font-size="12">・migration_cli が未適用マイグレーションの確認・適用手段をアプリに提供する</text>
+</svg>

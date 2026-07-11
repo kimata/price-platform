@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b949e"/>
+    </marker>
+  </defs>
+  <rect width="960" height="620" fill="#ffffff"/>
+  <text x="30" y="34" fill="#1f2328" font-weight="700" font-size="15">価格イベント検出パイプライン(store/)</text>
+
+  <!-- 入力 -->
+  <rect x="30" y="56" width="230" height="66" rx="8" fill="#ffffff" stroke="#57606a" stroke-width="1.3"/>
+  <text x="145" y="82" text-anchor="middle" fill="#1f2328" font-weight="700">アプリのクローラ</text>
+  <text x="145" y="102" text-anchor="middle" fill="#57606a" font-size="11">現在価格を収集して detect_events()</text>
+
+  <line x1="260" y1="89" x2="308" y2="89" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- detector -->
+  <rect x="312" y="56" width="300" height="66" rx="8" fill="#e7f0fb" stroke="#2a78d6" stroke-width="1.4"/>
+  <text x="462" y="80" text-anchor="middle" fill="#1c5cab" font-weight="700">PriceEventDetector.detect_events()</text>
+  <text x="462" y="100" text-anchor="middle" fill="#1f2328" font-size="11.5">variant_key_extractor でバリアント別にグループ化</text>
+
+  <line x1="612" y1="89" x2="660" y2="89" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <rect x="664" y="56" width="266" height="66" rx="8" fill="#e7f0fb" stroke="#2a78d6"/>
+  <text x="797" y="80" text-anchor="middle" fill="#1c5cab" font-weight="700">selection_key ごとに検出</text>
+  <text x="797" y="100" text-anchor="middle" fill="#1f2328" font-size="11.5">価格履歴・最安値・売却実績も同じ粒度で取得</text>
+
+  <line x1="797" y1="122" x2="797" y2="152" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- context builder -->
+  <rect x="530" y="156" width="400" height="102" rx="8" fill="#f8f9fa" stroke="#2a78d6" stroke-width="1.4"/>
+  <text x="546" y="180" fill="#1c5cab" font-weight="700">PriceContextBuilder.build()  (_price_event_context)</text>
+  <text x="546" y="202" fill="#1f2328" font-size="12">PriceStoreProtocol 経由で履歴を取得し PriceContext を構築</text>
+  <text x="546" y="220" fill="#1f2328" font-size="12">history_days = {7, 30, rarity窓, 下落基準窓, 回復窓} ∪ period_low_days</text>
+  <text x="546" y="240" fill="#57606a" font-size="11">全ルールの窓日数を個別に含める(欠けると当該ルールが沈黙する)</text>
+
+  <line x1="530" y1="207" x2="482" y2="207" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- rules -->
+  <rect x="30" y="156" width="452" height="196" rx="8" fill="#e7f0fb" stroke="#2a78d6" stroke-width="1.4"/>
+  <text x="46" y="180" fill="#1c5cab" font-weight="700">検出ルール(_price_event_rules) — PriceContext を評価</text>
+  <g font-size="12" fill="#1f2328">
+    <rect x="46" y="192" width="200" height="28" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+    <text x="146" y="211" text-anchor="middle">check_all_time_low(史上最安)</text>
+    <rect x="256" y="192" width="210" height="28" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+    <text x="361" y="211" text-anchor="middle">check_period_low(期間内最安)</text>
+    <rect x="46" y="228" width="200" height="28" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+    <text x="146" y="247" text-anchor="middle">check_statistical_low(希少度)</text>
+    <rect x="256" y="228" width="210" height="28" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+    <text x="361" y="247" text-anchor="middle">check_price_drop(急落)</text>
+    <rect x="46" y="264" width="200" height="28" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+    <text x="146" y="283" text-anchor="middle">check_price_recovery(底打ち)</text>
+    <rect x="256" y="264" width="210" height="28" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+    <text x="361" y="283" text-anchor="middle">check_good_used_deal(中古割安)</text>
+    <rect x="46" y="300" width="200" height="28" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+    <text x="146" y="319" text-anchor="middle">check_flea_bargain(フリマ格安)</text>
+  </g>
+  <text x="256" y="320" fill="#57606a" font-size="11">→ PriceEventDraft(priority 昇順に整列)</text>
+
+  <line x1="146" y1="352" x2="146" y2="388" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- suppression -->
+  <rect x="30" y="392" width="452" height="120" rx="8" fill="#fdf3d7" stroke="#c98500" stroke-width="1.4"/>
+  <text x="46" y="416" fill="#8a5a00" font-weight="700">apply_event_suppression(_price_event_suppression)</text>
+  <text x="46" y="438" fill="#1f2328" font-size="12">① 類似価格イベント抑制(14日以内・±tolerance、selection 単位)</text>
+  <text x="46" y="456" fill="#1f2328" font-size="12">② 同一状態イベント抑制(24時間窓・family / rarity_tier 比較)</text>
+  <text x="46" y="474" fill="#1f2328" font-size="12">③ priority が高い新イベントは既存を suppress して上書き</text>
+  <text x="46" y="496" fill="#57606a" font-size="11">検出と同じ selection_key 粒度で照会(クロスバリアント抑制を防止)</text>
+
+  <line x1="482" y1="452" x2="530" y2="452" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- store -->
+  <rect x="534" y="392" width="396" height="120" rx="8" fill="#f3f4f6" stroke="#8b949e" stroke-width="1.4"/>
+  <text x="550" y="416" fill="#414a55" font-weight="700">BasePriceEventStore(price_event_store)</text>
+  <text x="550" y="438" fill="#1f2328" font-size="12">price_events テーブル(selection_key 列は構成可能)</text>
+  <text x="550" y="456" fill="#1f2328" font-size="12">保存 / 抑制照会 / 一覧・件数 API / 種別別検出数の集計</text>
+  <text x="550" y="474" fill="#1f2328" font-size="12">検出数集計は healthz のゼロ検出監視が利用</text>
+
+  <line x1="732" y1="512" x2="732" y2="548" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <rect x="534" y="552" width="396" height="48" rx="8" fill="#fdeee5" stroke="#eb6834"/>
+  <text x="732" y="581" text-anchor="middle" fill="#b34a1d" font-weight="700">NotificationManager.enqueue() へ(通知配信)</text>
+
+  <text x="30" y="586" fill="#57606a" font-size="11">アプリは PriceStoreProtocol / PriceEventStoreProtocol と event_factory・イベント種別 Enum を注入する</text>
+</svg>

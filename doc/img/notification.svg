@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b949e"/>
+    </marker>
+  </defs>
+  <rect width="960" height="640" fill="#ffffff"/>
+  <text x="30" y="34" fill="#1f2328" font-weight="700" font-size="15">通知アーキテクチャ(notification/)— 2 チャネルとも非同期ワーカー</text>
+
+  <!-- manager -->
+  <rect x="330" y="52" width="300" height="76" rx="8" fill="#fdeee5" stroke="#eb6834" stroke-width="1.5"/>
+  <text x="480" y="78" text-anchor="middle" fill="#b34a1d" font-weight="700">NotificationManager.enqueue(event)</text>
+  <text x="480" y="98" text-anchor="middle" fill="#1f2328" font-size="11.5">製品解決 → 各チャネルへ振り分け</text>
+  <text x="480" y="116" text-anchor="middle" fill="#57606a" font-size="11">twitter_enabled は Twitter のみのゲート</text>
+
+  <line x1="400" y1="128" x2="240" y2="168" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <line x1="560" y1="128" x2="716" y2="168" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- Twitter 側 -->
+  <rect x="30" y="172" width="430" height="216" rx="8" fill="#f8f9fa" stroke="#2a78d6" stroke-width="1.4"/>
+  <text x="46" y="196" fill="#1c5cab" font-weight="700">Twitter チャネル(永続キュー + ワーカー)</text>
+
+  <rect x="46" y="210" width="398" height="76" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+  <text x="60" y="230" fill="#1f2328" font-weight="700" font-size="12">NotificationStore(SQLite)</text>
+  <text x="60" y="248" fill="#1f2328" font-size="11.5">queue: pending → posted / failed / skipped</text>
+  <text x="60" y="264" fill="#1f2328" font-size="11.5">posting_history(投稿間隔・24h 重複判定) / rate_limit_state(429 の永続化)</text>
+
+  <line x1="245" y1="286" x2="245" y2="306" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <rect x="46" y="310" width="398" height="66" rx="6" fill="#ffffff" stroke="#9ec5f4"/>
+  <text x="60" y="330" fill="#1f2328" font-weight="700" font-size="12">TwitterPoster(ワーカースレッド)</text>
+  <text x="60" y="348" fill="#1f2328" font-size="11.5">同一製品 24h スキップ / リトライ / 429 はヘッダ解析 or 900 秒フォールバック待機</text>
+  <text x="60" y="366" fill="#57606a" font-size="11">投稿文は social_posts + market 情報から build_social_message で組み立て</text>
+
+  <!-- WebPush 側 -->
+  <rect x="500" y="172" width="430" height="216" rx="8" fill="#f8f9fa" stroke="#1baf7a" stroke-width="1.4"/>
+  <text x="516" y="196" fill="#0e7a54" font-weight="700">Web Push チャネル(ディスパッチャ + ワーカー)</text>
+
+  <rect x="516" y="210" width="398" height="58" rx="6" fill="#ffffff" stroke="#8fdcc0"/>
+  <text x="530" y="230" fill="#1f2328" font-weight="700" font-size="12">WebPushDispatcher(ワーカースレッド)</text>
+  <text x="530" y="248" fill="#1f2328" font-size="11.5">submit() は非ブロッキング / 全滅時のみジョブ再試行(重複送信を回避)</text>
+
+  <line x1="715" y1="268" x2="715" y2="288" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <rect x="516" y="292" width="398" height="84" rx="6" fill="#ffffff" stroke="#8fdcc0"/>
+  <text x="530" y="312" fill="#1f2328" font-weight="700" font-size="12">BaseWebPushSender</text>
+  <text x="530" y="330" fill="#1f2328" font-size="11.5">購読フィルタで対象抽出 → WebPushPayload → pywebpush(タイムアウト 10 秒)</text>
+  <text x="530" y="348" fill="#1f2328" font-size="11.5">404/410 → expired 無効化 / 連続 7 回失敗 → 自動無効化</text>
+  <text x="530" y="366" fill="#1f2328" font-size="11.5">送信の機会に inactive 購読を掃除</text>
+
+  <!-- 外部 -->
+  <line x1="245" y1="388" x2="245" y2="424" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <rect x="140" y="428" width="210" height="44" rx="8" fill="#ffffff" stroke="#57606a"/>
+  <text x="245" y="455" text-anchor="middle" fill="#1f2328" font-weight="700">X (Twitter) API</text>
+  <line x1="715" y1="388" x2="715" y2="424" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+  <rect x="610" y="428" width="210" height="44" rx="8" fill="#ffffff" stroke="#57606a"/>
+  <text x="715" y="455" text-anchor="middle" fill="#1f2328" font-weight="700">Push サービス(ブラウザ)</text>
+
+  <!-- 購読ストア -->
+  <rect x="30" y="500" width="560" height="110" rx="8" fill="#e2f6ee" stroke="#1baf7a" stroke-width="1.4"/>
+  <text x="46" y="524" fill="#0e7a54" font-weight="700">BaseWebPushStore(SQLite)</text>
+  <text x="46" y="546" fill="#1f2328" font-size="12">webpush_subscriptions: group / event_type / product フィルタ(空リストと NULL を区別)、</text>
+  <text x="46" y="564" fill="#1f2328" font-size="12">連続失敗カウント。保存はアトミックな upsert(ON CONFLICT)</text>
+  <text x="46" y="586" fill="#1f2328" font-size="12">webpush_delivery_logs: 送信結果の履歴 → 期間集計 / 日次推移(成功率)</text>
+
+  <rect x="620" y="500" width="310" height="110" rx="8" fill="#edeafa" stroke="#4a3aa7" stroke-width="1.4"/>
+  <text x="636" y="524" fill="#3b2e86" font-weight="700">status.py</text>
+  <text x="636" y="546" fill="#1f2328" font-size="12">Twitter / Web Push の状態 payload を構築</text>
+  <text x="636" y="564" fill="#1f2328" font-size="12">(キュー滞留・レート制限・購読数・</text>
+  <text x="636" y="582" fill="#1f2328" font-size="12">配信成功率の日次推移)→ アプリの管理画面へ</text>
+
+  <line x1="590" y1="540" x2="618" y2="540" stroke="#8b949e" stroke-width="1.2" marker-end="url(#arr)"/>
+</svg>
