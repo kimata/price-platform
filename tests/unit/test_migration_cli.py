@@ -33,5 +33,7 @@ def test_migration_cli_applies_client_metrics_legacy_fixture(tmp_path: pathlib.P
     assert exit_code == 0
     assert "pending=none" in captured.out
     with sqlite3.connect(db_path) as conn:
-        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+        tables = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        }
     assert "social_referral_events" in tables

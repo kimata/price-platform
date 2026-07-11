@@ -101,14 +101,18 @@ def score_observation_details(
 
     if observation.anchor_keywords:
         matched_anchor = sum(
-            1 for keyword in observation.anchor_keywords if keyword_matcher(keyword, observation.title_normalized)
+            1
+            for keyword in observation.anchor_keywords
+            if keyword_matcher(keyword, observation.title_normalized)
         )
         anchor_coverage = matched_anchor / len(observation.anchor_keywords)
     else:
         anchor_coverage = 0.0
 
     token_scores = [
-        jaccard_similarity(set(tokenize_title(observation.listing_title)), set(tokenize_title(record.listing_title)))
+        jaccard_similarity(
+            set(tokenize_title(observation.listing_title)), set(tokenize_title(record.listing_title))
+        )
         for record in admitted_reference
     ]
     trigram_scores = [

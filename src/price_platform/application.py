@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Any, Protocol, TypeVar
 
 import flask
 
@@ -14,7 +15,18 @@ import price_platform.store_runtime
 import price_platform.webapp
 from price_platform.identity import AppIdentity
 
-ConfigT = TypeVar("ConfigT")
+
+class SupportsStandardAppConfig(Protocol):
+    """標準アプリ骨格が設定オブジェクトに要求する最小インターフェース。"""
+
+    @property
+    def webapp(self) -> Any: ...
+
+    @property
+    def absolute_cache_path(self) -> pathlib.Path: ...
+
+
+ConfigT = TypeVar("ConfigT", bound=SupportsStandardAppConfig)
 PriceStoreT = TypeVar("PriceStoreT")
 PriceEventStoreT = TypeVar("PriceEventStoreT")
 MetricsDbT = TypeVar("MetricsDbT")
@@ -38,7 +50,7 @@ COMMON_HTML_CONTENT_SECURITY_POLICY = (
 
 
 @dataclass(frozen=True)
-class StoreRuntimeFactories(Generic[ConfigT, PriceStoreT, PriceEventStoreT]):
+class StoreRuntimeFactories[ConfigT: SupportsStandardAppConfig, PriceStoreT, PriceEventStoreT]:
     """型付き `StoreRuntime` を構築するためのファクトリー群。"""
 
     price_store_factory: Callable[[ConfigT], PriceStoreT]
@@ -46,7 +58,13 @@ class StoreRuntimeFactories(Generic[ConfigT, PriceStoreT, PriceEventStoreT]):
 
 
 @dataclass(frozen=True)
-class ServiceFactories(Generic[ConfigT, MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]):
+class ServiceFactories[
+    ConfigT: SupportsStandardAppConfig,
+    MetricsDbT,
+    ClientMetricsDbT,
+    NotificationStoreT,
+    WebPushStoreT,
+]:
     """Web API が利用する依存サービスを生成するファクトリー群。"""
 
     metrics_db_factory: Callable[[ConfigT], MetricsDbT | None]
@@ -109,7 +127,7 @@ def _resolve_extension_key(*, extension_key: str | None, identity: AppIdentity |
     return extension_key
 
 
-def build_store_runtime_builder(
+def build_store_runtime_builder[PriceStoreT, PriceEventStoreT](
     *,
     price_store_type: type[PriceStoreT],
     price_event_store_type: type[PriceEventStoreT],
@@ -138,7 +156,7 @@ def build_optional_service_factory(
     return _factory
 
 
-def safe_service_getter(getter: Callable[[], ServiceT]) -> Callable[[], ServiceT | None]:
+def safe_service_getter[ServiceT](getter: Callable[[], ServiceT]) -> Callable[[], ServiceT | None]:
     """未初期化 RuntimeError を握りつぶす getter を返す。"""
 
     def _get() -> ServiceT | None:
@@ -150,21 +168,47 @@ def safe_service_getter(getter: Callable[[], ServiceT]) -> Callable[[], ServiceT
     return _get
 
 
-def build_service_builder(
+def build_service_builder[
+    ConfigT: SupportsStandardAppConfig,
+    MetricsDbT,
+    ClientMetricsDbT,
+    NotificationStoreT,
+    WebPushStoreT,
+](
     factories: ServiceFactories[ConfigT, MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT],
-) -> Callable[[ConfigT], price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]]:
+) -> Callable[
+    [ConfigT],
+    price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT],
+]:
     """サービス factory 群から service builder を作る。"""
     return lambda config: build_app_services(config, factories)
 
 
-def build_standard_service_builder(
+def build_standard_service_builder[
+    ConfigT: SupportsStandardAppConfig,
+    MetricsDbT,
+    ClientMetricsDbT,
+    NotificationStoreT,
+    WebPushStoreT,
+](
     factories: ServiceFactories[ConfigT, MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT],
-) -> Callable[[ConfigT], price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]]:
+) -> Callable[
+    [ConfigT],
+    price_platform.webapp.AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT],
+]:
     """標準 Web API 向け service builder を返す。"""
     return build_service_builder(factories)
 
 
-def build_standard_webapi_dependency_spec(
+def build_standard_webapi_dependency_spec[
+    PriceStoreT,
+    PriceEventStoreT,
+    ConfigT: SupportsStandardAppConfig,
+    MetricsDbT,
+    ClientMetricsDbT,
+    NotificationStoreT,
+    WebPushStoreT,
+](
     *,
     extension_key: str | None = None,
     identity: AppIdentity | None = None,
@@ -190,7 +234,15 @@ def build_standard_webapi_dependency_spec(
     )
 
 
-def build_standard_webapi_context(
+def build_standard_webapi_context[
+    PriceStoreT,
+    PriceEventStoreT,
+    ConfigT: SupportsStandardAppConfig,
+    MetricsDbT,
+    ClientMetricsDbT,
+    NotificationStoreT,
+    WebPushStoreT,
+](
     *,
     extension_key: str | None = None,
     identity: AppIdentity | None = None,
@@ -232,7 +284,7 @@ def create_standard_webapi_app(
     """共通骨格から標準 Web API アプリを組み立てる。"""
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-    external_url = getattr(getattr(config, "webapp"), "external_url", None)  # noqa: B009
+    external_url = getattr(config.webapp, "external_url", None)
     if external_url is None:
         msg = "Configuration error: webapp.external_url is required"
         raise ValueError(msg)
@@ -243,7 +295,8 @@ def create_standard_webapi_app(
             url_prefix=definition.url_prefix,
             external_url=external_url,
             base_dir=definition.base_dir,
-            flea_thumb_dir=getattr(config, "absolute_cache_path") / definition.flea_thumb_subdir,  # noqa: B009
+            flea_thumb_dir=config.absolute_cache_path / definition.flea_thumb_subdir,
+            # StoresT はアプリ固有型のため price_store のみ動的参照
             healthcheck=lambda: getattr(dependencies.stores, "price_store").get_last_update_time(),  # noqa: B009
             cache_rules=definition.cache_rules,
             html_content_security_policy=definition.html_content_security_policy,

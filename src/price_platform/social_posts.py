@@ -181,7 +181,11 @@ def _build_fact_line(ctx: SocialPostContext) -> str:
         return f"{base}。過去の価格推移と見比べても安値圏です。"
     if ctx.event_type_value == "price_drop" and ctx.previous_price:
         return f"{base}。前回 {ctx.previous_price:,}円 から下がっています。"
-    if ctx.event_type_value.startswith("period_low_") and ctx.reference_price and ctx.change_percent is not None:
+    if (
+        ctx.event_type_value.startswith("period_low_")
+        and ctx.reference_price
+        and ctx.change_percent is not None
+    ):
         return f"{base}。期間平均 {ctx.reference_price:,}円 より {abs(ctx.change_percent):.0f}%低めです。"
     if ctx.event_type_value == "good_used_deal" and ctx.reference_price:
         ratio = int(ctx.price / ctx.reference_price * 100)
@@ -227,7 +231,9 @@ def compose_social_post(ctx: SocialPostContext) -> ComposedSocialPost:
         available_variants.append("hook")
     if trust_line:
         available_variants.append("trust")
-    variant = available_variants[_stable_index(f"{ctx.product_id}:{ctx.event_type_value}:variant", len(available_variants))]
+    variant = available_variants[
+        _stable_index(f"{ctx.product_id}:{ctx.event_type_value}:variant", len(available_variants))
+    ]
 
     post_id = _build_post_id(ctx)
     tracked_url = append_tracking_params(

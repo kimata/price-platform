@@ -6,7 +6,7 @@ import os
 import pathlib
 import secrets
 import threading
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 
 class SecretStore(Protocol):
@@ -33,8 +33,8 @@ class FileSecretStore:
     """
 
     _class_lock = threading.Lock()
-    _path_locks: dict[pathlib.Path, threading.Lock] = {}
-    _cache: dict[pathlib.Path, str] = {}
+    _path_locks: ClassVar[dict[pathlib.Path, threading.Lock]] = {}
+    _cache: ClassVar[dict[pathlib.Path, str]] = {}
 
     def __init__(self, path: pathlib.Path):
         self._path = path.resolve()

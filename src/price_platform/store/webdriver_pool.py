@@ -7,7 +7,7 @@ import pathlib
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Protocol, TypeVar
 
 from price_platform.platform import browser
 
@@ -32,7 +32,7 @@ ConfigT = TypeVar("ConfigT", bound=_SeleniumConfigOwner)
 
 
 @dataclass
-class BaseWebDriverPool(Generic[MakerT, ConfigT]):
+class BaseWebDriverPool[MakerT, ConfigT: _SeleniumConfigOwner]:
     """WebDriver pool keyed by maker-like objects with a ``value`` field.
 
     When *max_size* is set, the pool evicts the least-recently-used driver
@@ -107,7 +107,9 @@ class BaseWebDriverPool(Generic[MakerT, ConfigT]):
 
         maker_name = getattr(maker, "value", str(maker))
         count = self._consecutive_timeout_counts.get(maker, 0)
-        logger.warning("%s: 連続 %d 件のタイムアウトが発生したため、ドライバーを再起動します", maker_name, count)
+        logger.warning(
+            "%s: 連続 %d 件のタイムアウトが発生したため、ドライバーを再起動します", maker_name, count
+        )
         manager.restart_with_clean_profile()
         self._consecutive_timeout_counts[maker] = 0
         logger.info("%s: ドライバーの再起動が完了しました", maker_name)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Generic
+from typing import Any
 
 from price_platform.platform import clock
 
@@ -21,16 +21,16 @@ from ._price_event_rules import (
 )
 from ._price_event_suppression import apply_event_suppression
 from ._price_event_types import (
+    DetectedPriceEventProtocol,
     EventFactoryProtocol,
     EventMetadataAdapter,
     PriceContext,
     PriceEventConfig,
     PriceEventDraft,
     PriceEventStoreProtocol,
-    PriceEventT,
-    PriceRecordT,
+    PriceRecordProtocol,
     PriceStoreProtocol,
-    SoldRecordT,
+    SoldRecordProtocol,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def build_standard_flea_market_stores(store_types: Any) -> tuple[Any, ...]:
     return tuple(getattr(store_types, name) for name in STANDARD_FLEA_MARKET_STORE_NAMES)
 
 
-class KeywordEventFactory(Generic[PriceEventT]):
+class KeywordEventFactory[PriceEventT: DetectedPriceEventProtocol]:
     """Adapter from ``**kwargs`` callables to the typed event-factory protocol."""
 
     def __init__(self, builder: Callable[..., PriceEventT]):
@@ -71,7 +71,11 @@ class KeywordEventFactory(Generic[PriceEventT]):
         return self._builder(**filtered)
 
 
-class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
+class PriceEventDetector[
+    PriceEventT: DetectedPriceEventProtocol,
+    PriceRecordT: PriceRecordProtocol[Any],
+    SoldRecordT: SoldRecordProtocol,
+]:
     """Detect price events from app-specific price records."""
 
     def __init__(
@@ -96,7 +100,9 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
             self.event_factory = event_factory  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
         else:
             self.event_factory = KeywordEventFactory(event_factory)  # type: ignore[arg-type]
-        self.event_extra_fields: EventMetadataAdapter[PriceRecordT] = event_extra_fields or (lambda record: {})
+        self.event_extra_fields: EventMetadataAdapter[PriceRecordT] = event_extra_fields or (
+            lambda record: {}
+        )
         self.config = config or PriceEventConfig()
 
     def _build_event(self, draft: PriceEventDraft) -> PriceEventT:
@@ -231,6 +237,7 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
             product_id=product_id,
             detected=detected,
             config=self.config,
+            selection_key=selection_key,
         )
 
     def detect_events_only(
@@ -247,9 +254,7 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
         now = clock.now()
         return self._detect_events(ctx, now)
 
-    def _group_by_variant(
-        self, prices: list[PriceRecordT]
-    ) -> dict[str | None, list[PriceRecordT]]:
+    def _group_by_variant(self, prices: list[PriceRecordT]) -> dict[str | None, list[PriceRecordT]]:
         """Group prices by variant key extracted via config.variant_key_extractor."""
         groups: dict[str | None, list[PriceRecordT]] = {}
         for price in prices:
@@ -268,8 +273,6 @@ class PriceEventDetector(Generic[PriceEventT, PriceRecordT, SoldRecordT]):
 
         all_events: list[PriceEventT] = []
         for variant_key, variant_prices in variant_groups.items():
-            events = self.detect_events_for_product(
-                product_id, variant_prices, selection_key=variant_key
-            )
+            events = self.detect_events_for_product(product_id, variant_prices, selection_key=variant_key)
             all_events.extend(events)
         return all_events

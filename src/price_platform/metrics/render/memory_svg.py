@@ -6,7 +6,7 @@ import collections.abc
 from datetime import datetime
 from xml.sax.saxutils import escape
 
-from .managers.pod_memory_tracker import MemorySeriesSnapshot
+from ...managers.pod_memory_tracker import MemorySeriesSnapshot
 
 
 def generate_memory_usage_svg(
@@ -126,22 +126,28 @@ def generate_memory_usage_svg(
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
         f'viewBox="0 0 {width} {height}" role="img" aria-label="Pod and Selenium memory usage">'
         '<rect width="100%" height="100%" fill="#ffffff"/>'
-        f'{"".join(y_ticks)}'
-        f'{"".join(x_ticks)}'
+        f"{''.join(y_ticks)}"
+        f"{''.join(x_ticks)}"
         f'<line x1="{margin_left}" y1="{margin_top + chart_height}" '
         f'x2="{margin_left + chart_width}" y2="{margin_top + chart_height}" '
         'stroke="#94a3b8" stroke-width="1.5"/>'
         f'<line x1="{margin_left}" y1="{margin_top}" x2="{margin_left}" y2="{margin_top + chart_height}" '
         'stroke="#94a3b8" stroke-width="1.5"/>'
-        f'{_legend(24, legend_y, "#0f172a", "Pod total")}'
-        f'{_legend(164, legend_y, "#2563eb", "Selenium")}'
-        f'<path d="{pod_path}" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
-        f'<path d="{selenium_path}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+        f"{_legend(24, legend_y, '#0f172a', 'Pod total')}"
+        f"{_legend(164, legend_y, '#2563eb', 'Selenium')}"
+        f'<path d="{pod_path}" fill="none" stroke="#0f172a" stroke-width="2.5"'
+        ' stroke-linecap="round" stroke-linejoin="round"/>'
+        f'<path d="{selenium_path}" fill="none" stroke="#2563eb" stroke-width="2"'
+        ' stroke-linecap="round" stroke-linejoin="round"/>'
         "</svg>"
     )
 
 
-def _build_line_path(points: tuple[tuple[float, float], ...] | list[tuple[float, float]] | collections.abc.Iterable[tuple[float, float]]) -> str:
+def _build_line_path(
+    points: tuple[tuple[float, float], ...]
+    | list[tuple[float, float]]
+    | collections.abc.Iterable[tuple[float, float]],
+) -> str:
     point_list = list(points)
     if not point_list:
         return ""

@@ -71,7 +71,9 @@ def _parse_period_days(event_type_value: str) -> int | None:
 
 
 def format_event_message_from_event(event: Any, product_name: str) -> str:
-    event_type = getattr(getattr(event, "event_type", None), "value", None) or str(getattr(event, "event_type", ""))
+    event_type = getattr(getattr(event, "event_type", None), "value", None) or str(
+        getattr(event, "event_type", "")
+    )
     return format_event_message(
         product_name,
         event_type_value=event_type,
@@ -81,4 +83,3 @@ def format_event_message_from_event(event: Any, product_name: str) -> str:
         period_days=getattr(event, "period_days", None),
         rarity_tier=getattr(event, "rarity_tier", None),
     )
-

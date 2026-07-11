@@ -76,7 +76,11 @@ def verify_notification_manager_skips_disabled_event_contract(
     *,
     event_factory: Callable[[], MagicMock] | None = None,
 ) -> None:
-    """twitter 無効イベントを enqueue しても store を叩かないことを検証する。"""
+    """twitter 無効イベントが Twitter キューには入らないことを検証する。
+
+    twitter_enabled は Twitter 投稿のみのゲートであり、
+    Web Push など他チャネルの送信は遮断しない (B10)。
+    """
     event = event_factory() if event_factory is not None else MagicMock()
     event.twitter_enabled = False
     manager.enqueue(event)

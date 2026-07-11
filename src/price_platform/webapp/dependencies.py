@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, TypeVar, cast
+from typing import TypeVar, cast
 
 import flask
 
@@ -53,7 +53,7 @@ def _validate_service_source(
 
 
 @dataclass(frozen=True)
-class AppServices(Generic[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]):
+class AppServices[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebPushStoreT]:
     """Optional service accessors used by Web APIs."""
 
     _metrics_db: MetricsDbT | None = None
@@ -91,7 +91,7 @@ class AppServices(Generic[MetricsDbT, ClientMetricsDbT, NotificationStoreT, WebP
 
 
 @dataclass(frozen=True)
-class AppDependencies(Generic[ConfigT, StoresT, ServicesT]):
+class AppDependencies[ConfigT, StoresT, ServicesT]:
     """Common dependency container shape for Flask apps."""
 
     config: ConfigT
@@ -100,7 +100,7 @@ class AppDependencies(Generic[ConfigT, StoresT, ServicesT]):
 
 
 @dataclass(frozen=True)
-class WebApiDependencySpec(Generic[ConfigT, StoresT, ServicesT]):
+class WebApiDependencySpec[ConfigT, StoresT, ServicesT]:
     """Web API 依存構成を宣言的に表す spec。"""
 
     extension_key: str
@@ -109,7 +109,7 @@ class WebApiDependencySpec(Generic[ConfigT, StoresT, ServicesT]):
 
 
 @dataclass(frozen=True)
-class WebApiContext(Generic[ConfigT, StoresT, ServicesT]):
+class WebApiContext[ConfigT, StoresT, ServicesT]:
     """Web API 依存構成と accessor 群をまとめたコンテキスト。"""
 
     spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT]
@@ -168,7 +168,7 @@ def build_app_services(
     )
 
 
-def build_app_dependencies(
+def build_app_dependencies[ConfigT, StoresT, ServicesT](
     config: ConfigT,
     stores: StoresT,
     services: ServicesT,
@@ -189,7 +189,9 @@ def build_webapi_dependencies(
     )
 
 
-def install_dependencies(app: flask.Flask, extension_key: str, dependencies: DependenciesT) -> DependenciesT:
+def install_dependencies[DependenciesT](
+    app: flask.Flask, extension_key: str, dependencies: DependenciesT
+) -> DependenciesT:
     """Attach a dependency container to ``app.extensions``."""
     app.extensions[extension_key] = dependencies
     return dependencies
@@ -212,29 +214,35 @@ def get_dependencies(extension_key: str) -> object:
     return dependencies
 
 
-def get_typed_dependencies(extension_key: str, dependencies_type: type[DependenciesT]) -> DependenciesT:
+def get_typed_dependencies[DependenciesT](
+    extension_key: str, dependencies_type: type[DependenciesT]
+) -> DependenciesT:
     """Return a typed dependency container."""
     return cast(DependenciesT, get_dependencies(extension_key))
 
 
-def get_webapi_dependencies(
+def get_webapi_dependencies[ConfigT, StoresT, ServicesT](
     spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT],
 ) -> AppDependencies[ConfigT, StoresT, ServicesT]:
     """spec に対応する Web API 依存コンテナを返す。"""
     return get_typed_dependencies(spec.extension_key, AppDependencies)
 
 
-def get_webapi_config(spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT]) -> ConfigT:
+def get_webapi_config[ConfigT, StoresT, ServicesT](
+    spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT],
+) -> ConfigT:
     """spec に対応するアプリ設定を返す。"""
     return get_webapi_dependencies(spec).config
 
 
-def get_webapi_services(spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT]) -> ServicesT:
+def get_webapi_services[ConfigT, StoresT, ServicesT](
+    spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT],
+) -> ServicesT:
     """spec に対応するサービス束を返す。"""
     return get_webapi_dependencies(spec).services
 
 
-def build_webapi_context(
+def build_webapi_context[ConfigT, StoresT, ServicesT](
     spec: WebApiDependencySpec[ConfigT, StoresT, ServicesT],
 ) -> WebApiContext[ConfigT, StoresT, ServicesT]:
     """spec から標準的な Web API context を構築する。"""

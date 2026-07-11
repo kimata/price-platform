@@ -147,7 +147,19 @@ def test_price_event_store_persists_stat_fields(tmp_path: pathlib.Path) -> None:
             """
         ).fetchone()
 
-    assert row == (1.2, "VERY_HIGH", 11200, 90, 90, 365, "v2", "variant-1", "statistical_low", "historical_distribution", "very_high")
+    assert row == (
+        1.2,
+        "VERY_HIGH",
+        11200,
+        90,
+        90,
+        365,
+        "v2",
+        "variant-1",
+        "statistical_low",
+        "historical_distribution",
+        "very_high",
+    )
 
 
 def test_webpush_store_uses_canonical_schema_without_compat_migrations(tmp_path: pathlib.Path) -> None:
@@ -195,7 +207,10 @@ def test_webpush_store_uses_canonical_schema_without_compat_migrations(tmp_path:
 
 
 def test_schema_registry_resolves_bundled_schema() -> None:
-    assert resolve_schema_path("sqlite_notification.schema") == bundled_schema_dir() / "sqlite_notification.schema"
+    assert (
+        resolve_schema_path("sqlite_notification.schema")
+        == bundled_schema_dir() / "sqlite_notification.schema"
+    )
 
 
 def test_sqlite_store_base_can_delay_initialization(tmp_path: pathlib.Path) -> None:
@@ -217,7 +232,44 @@ def test_sqlite_store_base_can_delay_initialization(tmp_path: pathlib.Path) -> N
     store.initialize()
 
     with sqlite3.connect(db_path) as conn:
-        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+        tables = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        }
 
     assert "demo" in tables
     assert "schema_metadata" in tables
+
+
+def test_metrics_db_migrates_old_crawl_sessions_table(tmp_path: pathlib.Path) -> None:
+    """B7 回帰: round_count 等の列が無い旧 DB でも書き込みが失敗しない."""
+    import price_platform.metrics.server.db
+
+    db_path = tmp_path / "metrics.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE crawl_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at TEXT NOT NULL,
+                ended_at TEXT,
+                duration_sec REAL,
+                total_items INTEGER DEFAULT 0,
+                success_items INTEGER DEFAULT 0,
+                failed_items INTEGER DEFAULT 0,
+                total_products INTEGER DEFAULT 0,
+                success_products INTEGER DEFAULT 0
+            );
+            """
+        )
+        conn.execute("INSERT INTO crawl_sessions (started_at) VALUES ('2026-07-01T00:00:00')")
+
+    db = price_platform.metrics.server.db.MetricsDB(db_path)
+
+    # 旧 DB に列が追加されている
+    with sqlite3.connect(db_path) as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(crawl_sessions)").fetchall()}
+    assert "round_count" in columns
+    assert "exit_reason" in columns
+
+    # 書き込み側 API が OperationalError にならない
+    assert db.increment_round_count(1) == 1

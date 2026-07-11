@@ -4,15 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
-import jwt
+from ._jwt_service import JWT_ALGORITHM, decode_token, encode_token
 
-from .secrets import FileSecretStore
-
-JWT_ALGORITHM = "HS256"
+__all__ = ["JWT_ALGORITHM"]  # 公開 facade からの再エクスポート互換
 
 
 @dataclass(frozen=True)
@@ -28,25 +26,15 @@ class SupportsMetricsConfig(Protocol):
 
 
 def issue_auth_token(settings: MetricsAuthSettings) -> str:
-    secret = FileSecretStore(settings.jwt_secret_path).ensure()
-    now = datetime.now(UTC)
-    exp = now + timedelta(hours=settings.jwt_expiry_hours)
-    payload = {"sub": "user", "iat": int(now.timestamp()), "exp": int(exp.timestamp())}
-    return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
+    return encode_token(
+        settings.jwt_secret_path,
+        claims={"sub": "user"},
+        lifetime=timedelta(hours=settings.jwt_expiry_hours),
+    )
 
 
 def verify_auth_token(token: str, settings: MetricsAuthSettings) -> dict[str, Any] | None:
-    try:
-        secret = FileSecretStore(settings.jwt_secret_path).load()
-    except FileNotFoundError:
-        return None
-    try:
-        payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
-        return dict(payload)
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
+    return decode_token(settings.jwt_secret_path, token)
 
 
 def build_metrics_auth_settings_getter(

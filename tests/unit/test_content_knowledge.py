@@ -184,6 +184,6 @@ def test_knowledge_catalog_ensure_loaded_raises() -> None:
     catalog = price_platform.content.knowledge.KnowledgeCatalog()
     try:
         catalog.get_summaries()
-        assert False, "Expected RuntimeError"
+        raise AssertionError("Expected RuntimeError")
     except RuntimeError:
         pass

@@ -49,7 +49,7 @@ uv sync
   - `init_schema_from_file`
   - `exec_schema_from_file`
   - `recover`
-- `my_lib.time`
+- `my_lib.platform.time`
   - `get_tz`
   - `get_zoneinfo`
   - `now`

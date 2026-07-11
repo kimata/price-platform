@@ -5,10 +5,15 @@ from __future__ import annotations
 import collections.abc
 import pathlib
 import sqlite3
+import threading
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
-from ._metrics_sqlite_models import (
+from ..._singleton import SingletonHolder
+from ...schema_registry import resolve_schema_path
+from ...sqlite_store import SQLiteStoreBase
+from .migrations import METRICS_MIGRATIONS
+from .models import (
     HEARTBEAT_TIMEOUT_SEC,
     AmazonBatchStats,
     CrawlSession,
@@ -20,10 +25,8 @@ from ._metrics_sqlite_models import (
     StoreAggregateStats,
     StoreCrawlStats,
 )
-from .metrics_sqlite_reads import MetricsDBReadMixin
-from .metrics_sqlite_writes import MetricsDBWriteMixin
-from .schema_registry import resolve_schema_path
-from .sqlite_store import SQLiteStoreBase
+from .reads import MetricsDBReadMixin
+from .writes import MetricsDBWriteMixin
 
 if TYPE_CHECKING:
     pass
@@ -39,15 +42,19 @@ class MetricsDB(MetricsDBWriteMixin, MetricsDBReadMixin, SQLiteStoreBase):
         *,
         locking_mode: LockingMode = "NORMAL",
     ):
+        # ClientMetricsDB と同様に接続をロックで直列化し、
+        # マルチスレッド利用時の方針を統一する (R10)
+        self._lock = threading.RLock()
         super().__init__(
             db_path=db_path,
             schema_path=schema_path or resolve_schema_path("sqlite_metrics.schema"),
             locking_mode=locking_mode,
+            migrations=METRICS_MIGRATIONS,
         )
 
     @contextmanager
     def _get_connection(self) -> collections.abc.Iterator[sqlite3.Connection]:
-        with self.connection() as conn:
+        with self._lock, self.connection() as conn:
             yield conn
 
 
@@ -56,27 +63,22 @@ def open_metrics_db(db_path: pathlib.Path) -> MetricsDB:
     return MetricsDB(db_path)
 
 
-_metrics_db: MetricsDB | None = None
+_metrics_db_holder: SingletonHolder[MetricsDB] = SingletonHolder("MetricsDB", "init_metrics_db()")
 
 
 def get_metrics_db() -> MetricsDB:
     """Return the global metrics database instance."""
-    if _metrics_db is None:
-        raise RuntimeError("MetricsDB not initialized. Call init_metrics_db() first.")
-    return _metrics_db
+    return _metrics_db_holder.get()
 
 
 def init_metrics_db(db_path: pathlib.Path) -> MetricsDB:
     """Initialize and return the global metrics database instance."""
-    global _metrics_db
-    _metrics_db = open_metrics_db(db_path)
-    return _metrics_db
+    return _metrics_db_holder.set(open_metrics_db(db_path))
 
 
 def _reset_metrics_db() -> None:
     """Reset the global metrics database instance for tests."""
-    global _metrics_db
-    _metrics_db = None
+    _metrics_db_holder.reset()
 
 
 __all__ = [

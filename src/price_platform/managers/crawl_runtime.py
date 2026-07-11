@@ -6,7 +6,7 @@ import pathlib
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Generic, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 from .lifecycle_manager import LifecycleManager
 from .liveness_manager import LivenessManager
@@ -23,7 +23,7 @@ NotificationManagerT = TypeVar("NotificationManagerT", bound=SupportsStop)
 
 
 @dataclass(frozen=True)
-class CrawlRuntime(Generic[NotificationManagerT]):
+class CrawlRuntime[NotificationManagerT: SupportsStop]:
     """Runtime services for a crawl session."""
 
     lifecycle_manager: LifecycleManager

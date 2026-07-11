@@ -9,7 +9,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Generic, Literal, Protocol, TypeVar
+from typing import Literal, Protocol, TypeVar
 
 from price_platform.platform import clock
 from price_platform.schema_registry import resolve_schema_path
@@ -91,7 +91,7 @@ class PriceEventProtocol(Protocol):
 logger = logging.getLogger(__name__)
 
 
-class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
+class BasePriceEventStore[EventT](SQLiteStoreBase):
     """SQLite-backed event store with configurable selection column."""
 
     def __init__(
@@ -133,8 +133,9 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
                      rarity_window_days, detector_version, canonical_variant_key,
                      event_family, comparison_basis, severity,
                      {selection_sql}recorded_at, suppressed, superseded_by, twitter_posted, twitter_enabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {selection_placeholder}?, ?, ?, ?, ?)
-                """,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        {selection_placeholder}?, ?, ?, ?, ?)
+                """,  # noqa: S608 - 列名はクラス定数のみ埋め込み
                 (
                     event.event_type.value,
                     event.priority,
@@ -168,17 +169,38 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
             conn.commit()
             return cursor.lastrowid or 0
 
-    def get_recent_event_for_product(self, product_id: str, hours: int = 24) -> EventT | None:
+    @staticmethod
+    def _suppressed_filter(include_suppressed: bool, *, prefix: str = "AND") -> str:
+        """include_suppressed に応じた WHERE 断片を返す (同型 if/else クエリペアの集約)。"""
+        if include_suppressed:
+            return ""
+        return f" {prefix} suppressed = FALSE"
+
+    def _selection_filter(self, selection_key: str | None) -> tuple[str, tuple[str | None, ...]]:
+        """抑制系クエリに付与する selection フィルタ断片を返す。
+
+        検出はバリアント別 (selection_key) に行われるため、抑制側も同じ粒度で
+        照会しないと別バリアントの正当なイベントを誤って抑制する (B4)。
+        `IS ?` は NULL 同士も一致と判定する。
+        """
+        if self._selection_column is None:
+            return "", ()
+        return f" AND {CANONICAL_SELECTION_COLUMN} IS ?", (selection_key,)
+
+    def get_recent_event_for_product(
+        self, product_id: str, hours: int = 24, *, selection_key: str | None = None
+    ) -> EventT | None:
         since = clock.now() - timedelta(hours=hours)
+        selection_sql, selection_params = self._selection_filter(selection_key)
         with self._get_connection() as conn:
             row = conn.execute(
-                """
+                f"""
                 SELECT * FROM price_events
-                WHERE product_id = ? AND recorded_at >= ? AND suppressed = FALSE
+                WHERE product_id = ? AND recorded_at >= ? AND suppressed = FALSE{selection_sql}
                 ORDER BY priority ASC, recorded_at DESC
                 LIMIT 1
-                """,
-                (product_id, since.isoformat()),
+                """,  # noqa: S608
+                (product_id, since.isoformat(), *selection_params),
             ).fetchone()
             return self._row_to_event(row) if row else None
 
@@ -202,37 +224,24 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         include_suppressed: bool = False,
     ) -> list[EventT]:
         with self._get_connection() as conn:
-            if include_suppressed:
-                cursor = conn.execute(
-                    """
-                    SELECT * FROM price_events
-                    WHERE product_id = ?
-                    ORDER BY recorded_at DESC
-                    LIMIT ? OFFSET ?
-                    """,
-                    (product_id, limit, offset),
-                )
-            else:
-                cursor = conn.execute(
-                    """
-                    SELECT * FROM price_events
-                    WHERE product_id = ? AND suppressed = FALSE
-                    ORDER BY recorded_at DESC
-                    LIMIT ? OFFSET ?
-                    """,
-                    (product_id, limit, offset),
-                )
+            cursor = conn.execute(
+                f"""
+                SELECT * FROM price_events
+                WHERE product_id = ?{self._suppressed_filter(include_suppressed)}
+                ORDER BY recorded_at DESC
+                LIMIT ? OFFSET ?
+                """,  # noqa: S608
+                (product_id, limit, offset),
+            )
             return [self._row_to_event(row) for row in cursor.fetchall()]
 
     def get_events_count_for_product(self, product_id: str, include_suppressed: bool = False) -> int:
         with self._get_connection() as conn:
-            if include_suppressed:
-                row = conn.execute("SELECT COUNT(*) FROM price_events WHERE product_id = ?", (product_id,)).fetchone()
-            else:
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM price_events WHERE product_id = ? AND suppressed = FALSE",
-                    (product_id,),
-                ).fetchone()
+            row = conn.execute(
+                "SELECT COUNT(*) FROM price_events WHERE product_id = ?"  # noqa: S608
+                + self._suppressed_filter(include_suppressed),
+                (product_id,),
+            ).fetchone()
             return row[0] if row else 0
 
     def get_recent_events(
@@ -242,24 +251,14 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         include_suppressed: bool = False,
     ) -> list[EventT]:
         with self._get_connection() as conn:
-            if include_suppressed:
-                cursor = conn.execute(
-                    """
-                    SELECT * FROM price_events
-                    ORDER BY recorded_at DESC
-                    LIMIT ? OFFSET ?
-                    """,
-                    (limit, offset),
-                )
-            else:
-                cursor = conn.execute(
-                    """
-                    SELECT * FROM price_events
-                    WHERE suppressed = FALSE
-                    ORDER BY recorded_at DESC
-                    LIMIT ? OFFSET ?
-                    """,
-                    (limit, offset),
+            cursor = conn.execute(
+                f"""
+                SELECT * FROM price_events
+                {self._suppressed_filter(include_suppressed, prefix="WHERE")}
+                ORDER BY recorded_at DESC
+                LIMIT ? OFFSET ?
+                """,  # noqa: S608
+                (limit, offset),
             )
             return [self._row_to_event(row) for row in cursor.fetchall()]
 
@@ -275,26 +274,15 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
 
         placeholders = ",".join("?" * len(product_ids))
         with self._get_connection() as conn:
-            if include_suppressed:
-                cursor = conn.execute(
-                    f"""
-                    SELECT * FROM price_events
-                    WHERE product_id IN ({placeholders})
-                    ORDER BY recorded_at DESC
-                    LIMIT ? OFFSET ?
-                    """,  # noqa: S608
-                    (*product_ids, limit, offset),
-                )
-            else:
-                cursor = conn.execute(
-                    f"""
-                    SELECT * FROM price_events
-                    WHERE product_id IN ({placeholders}) AND suppressed = FALSE
-                    ORDER BY recorded_at DESC
-                    LIMIT ? OFFSET ?
-                    """,  # noqa: S608
-                    (*product_ids, limit, offset),
-                )
+            cursor = conn.execute(
+                f"""
+                SELECT * FROM price_events
+                WHERE product_id IN ({placeholders}){self._suppressed_filter(include_suppressed)}
+                ORDER BY recorded_at DESC
+                LIMIT ? OFFSET ?
+                """,  # noqa: S608
+                (*product_ids, limit, offset),
+            )
             return [self._row_to_event(row) for row in cursor.fetchall()]
 
     def get_events_count_for_products(self, product_ids: list[str], include_suppressed: bool = False) -> int:
@@ -303,26 +291,19 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
 
         placeholders = ",".join("?" * len(product_ids))
         with self._get_connection() as conn:
-            if include_suppressed:
-                row = conn.execute(
-                    f"SELECT COUNT(*) FROM price_events WHERE product_id IN ({placeholders})",  # noqa: S608
-                    product_ids,
-                ).fetchone()
-            else:
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM price_events"  # noqa: S608
-                    f" WHERE product_id IN ({placeholders}) AND suppressed = FALSE",
-                    product_ids,
-                ).fetchone()
+            row = conn.execute(
+                f"SELECT COUNT(*) FROM price_events WHERE product_id IN ({placeholders})"  # noqa: S608
+                + self._suppressed_filter(include_suppressed),
+                product_ids,
+            ).fetchone()
             return row[0] if row else 0
 
     def get_events_count(self, include_suppressed: bool = False) -> int:
         with self._get_connection() as conn:
-            row = (
-                conn.execute("SELECT COUNT(*) FROM price_events").fetchone()
-                if include_suppressed
-                else conn.execute("SELECT COUNT(*) FROM price_events WHERE suppressed = FALSE").fetchone()
-            )
+            row = conn.execute(
+                "SELECT COUNT(*) FROM price_events"  # noqa: S608
+                + self._suppressed_filter(include_suppressed, prefix="WHERE"),
+            ).fetchone()
             return row[0] if row else 0
 
     def get_unposted_twitter_events(self, limit: int = 10) -> list[EventT]:
@@ -352,23 +333,44 @@ class BasePriceEventStore(SQLiteStoreBase, Generic[EventT]):
         price: int,
         days: int = 14,
         tolerance: int = 100,
+        *,
+        selection_key: str | None = None,
     ) -> bool:
         since = clock.now() - timedelta(days=days)
         price_min = price - tolerance
         price_max = price + tolerance
         store_value = getattr(store, "value", store)
+        selection_sql, selection_params = self._selection_filter(selection_key)
         with self._get_connection() as conn:
             row = conn.execute(
-                """
+                f"""
                 SELECT 1 FROM price_events
                 WHERE product_id = ? AND store = ?
                   AND price >= ? AND price <= ?
-                  AND recorded_at >= ?
+                  AND recorded_at >= ?{selection_sql}
                 LIMIT 1
-                """,
-                (product_id, store_value, price_min, price_max, since.isoformat()),
+                """,  # noqa: S608
+                (product_id, store_value, price_min, price_max, since.isoformat(), *selection_params),
             ).fetchone()
             return row is not None
+
+    def get_event_counts_by_type(self, days: int = 7) -> dict[str, int]:
+        """直近 days 日のイベント種別ごとの検出数を返す (抑制済みも含む)。
+
+        検出パイプラインが黙って止まる事故 (B1) を監視するための集計 (F1)。
+        """
+        since = clock.now() - timedelta(days=days)
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT event_type, COUNT(*) as count
+                FROM price_events
+                WHERE recorded_at >= ?
+                GROUP BY event_type
+                """,
+                (since.isoformat(),),
+            ).fetchall()
+            return {row["event_type"]: row["count"] for row in rows}
 
     def cleanup_old_events(self, days: int = 365) -> int:
         cutoff = clock.now() - timedelta(days=days)

@@ -82,3 +82,35 @@ def test_check_web_servers_reports_shared_targets(monkeypatch) -> None:
 
     assert price_platform.healthz.check_web_servers(SimpleNamespace(), definition) is True
     assert [target.name for target in captured] == ["flask-api", "node-ssr"]  # type: ignore[union-attr]
+
+
+def test_check_detection_activity() -> None:
+    """F1: ゼロ検出の検知."""
+    from dataclasses import replace as dc_replace
+    from unittest.mock import MagicMock
+
+    import price_platform.healthz as healthz
+
+    definition = healthz.HealthzCliDefinition(
+        program_name="test",
+        logger_name="test",
+        api_healthz_url="http://localhost/healthz",
+        product_label="products",
+        config_loader=None,
+        metrics_db_factory=None,
+        total_product_count_getter=None,
+        detection_expected_event_types=("PRICE_DROP",),
+    )
+
+    # factory 未設定 → スキップして True
+    assert healthz.check_detection_activity(MagicMock(), definition)
+
+    # 検出あり → True
+    event_store = MagicMock()
+    event_store.get_event_counts_by_type.return_value = {"ALL_TIME_LOW": 3}
+    with_factory = dc_replace(definition, price_event_store_factory=lambda _config: event_store)
+    assert healthz.check_detection_activity(MagicMock(), with_factory)
+
+    # 全種別ゼロ → False
+    event_store.get_event_counts_by_type.return_value = {}
+    assert not healthz.check_detection_activity(MagicMock(), with_factory)

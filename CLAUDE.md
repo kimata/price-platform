@@ -25,8 +25,17 @@ price-platform は、商品価格の収集・表示を行う複数の Web アプ
 src/price_platform/
 ├── auth/           # 認証・認可 (API トークン, JWT, パスワードハッシュ, レートリミッター)
 ├── config/         # 設定ロード・バリデーション (YAML → dataclass)
-├── content/        # コンテンツモデル (About ページ等)
-└── webapp/         # Flask アプリ基盤 (ファクトリ, CORS, セキュリティヘッダ, リクエストコンテキスト)
+├── content/        # コンテンツモデル (About, お問い合わせ, 編集方針, 基礎知識記事)
+├── webapp/         # Flask アプリ基盤 (ファクトリ, CORS, セキュリティヘッダ, SEO ルート)
+├── store/          # 価格収集・価格イベント検出/抑制・キーワード学習
+├── notification/   # 通知 (Twitter キュー投稿, Web Push 購読/配信)
+├── metrics/        # メトリクス (server: クロール統計 / client: Web Vitals / render: SVG)
+├── managers/       # 常駐プロセス管理 (メトリクスマネージャ, メモリトラッカ等)
+├── platform/       # my_lib 境界の facade (clock, sqlite)
+├── migrations/     # client metrics 用マイグレーション定義
+├── schema/         # SQLite / YAML スキーマファイル
+└── (トップレベル)   # application.py (アプリ骨格), healthz.py, market_analysis.py,
+                    # sqlite_store.py (共有 SQLite 基盤), social_posts.py, cli.py など
 ```
 
 ## リポジトリとデプロイ

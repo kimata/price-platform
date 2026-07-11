@@ -143,7 +143,9 @@ class KnowledgeCatalog:
         for aid in article_ids:
             article = self._articles.get(aid)
             if article is not None:
-                result.append(KnowledgeSummary(id=article.id, title=article.title, description=article.description))
+                result.append(
+                    KnowledgeSummary(id=article.id, title=article.title, description=article.description)
+                )
         return result
 
     @property
@@ -156,10 +158,7 @@ class KnowledgeCatalog:
     def last_updates(self) -> dict[str, str | None]:
         """Map of article ID to date_modified (or date_published)."""
         self._ensure_loaded()
-        return {
-            a.id: a.date_modified or a.date_published
-            for a in self._articles.values()
-        }
+        return {a.id: a.date_modified or a.date_published for a in self._articles.values()}
 
 
 def load_knowledge_catalog(

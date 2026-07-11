@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import logging
 import pathlib
 import re
 import time
 import unicodedata
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Protocol, TypeVar
 
 import requests
 from bs4 import BeautifulSoup
+
+from .price_quarantine import QuarantinedPrice
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -92,7 +96,7 @@ class TitleExclusion:
 
 
 @dataclass(frozen=True)
-class FilterDecision(Generic[ScrapedPriceT]):
+class FilterDecision[ScrapedPriceT: _HasPrice]:
     listing: ScrapedPriceT
     admitted: bool
     reason: FilterReason | None = None
@@ -104,7 +108,7 @@ class FilterDecision(Generic[ScrapedPriceT]):
 
 
 @dataclass(frozen=True)
-class FilterResult(Generic[ScrapedPriceT]):
+class FilterResult[ScrapedPriceT: _HasPrice]:
     rule: ProductNameRule
     admitted: list[ScrapedPriceT]
     decisions: list[FilterDecision[ScrapedPriceT]]
@@ -176,18 +180,7 @@ class DefaultProductNameMatchingPolicy:
 
     def build_rule(self, *, product_name: str, base_rule: ProductNameRule) -> ProductNameRule:
         required_keywords = base_rule.required_keywords or tuple(product_name.split())
-        return ProductNameRule(
-            required_keywords=tuple(required_keywords),
-            anchor_keywords=tuple(base_rule.anchor_keywords),
-            flea_market_ng_words=tuple(base_rule.flea_market_ng_words),
-            condition_ng_words=tuple(base_rule.condition_ng_words),
-            partial_item_ng_words=tuple(base_rule.partial_item_ng_words),
-            parts_ng_words=tuple(base_rule.parts_ng_words),
-            parts_ng_price_threshold=base_rule.parts_ng_price_threshold,
-            exclude_product_names=tuple(base_rule.exclude_product_names),
-            exclude_yo_titles=base_rule.exclude_yo_titles,
-            exclude_empty_box_titles=base_rule.exclude_empty_box_titles,
-        )
+        return dataclasses.replace(base_rule, required_keywords=tuple(required_keywords))
 
     def keyword_in_title(self, keyword: str, title_upper: str) -> bool:
         return _keyword_in_title(keyword, title_upper)
@@ -256,7 +249,7 @@ def default_keyword_in_title(keyword: str, title_upper: str) -> bool:
     return _keyword_in_title(keyword, title_upper)
 
 
-def filter_by_product_name_match(
+def filter_by_product_name_match[ScrapedPriceT: _HasPrice](
     prices: list[ScrapedPriceT],
     product_name: str,
     store_name: str,
@@ -387,27 +380,63 @@ def filter_by_product_name_match(
     return FilterResult(rule=rule, admitted=filtered, decisions=decisions)
 
 
-def exclude_suspicious_prices(
+def exclude_suspicious_prices[ScrapedPriceT: _HasPrice](
     prices: list[ScrapedPriceT],
     reference_price: int,
     threshold_ratio_min: float,
     threshold_ratio_max: float,
     store_name: str,
     product_name: str,
+    *,
+    quarantine_recorder: Callable[[QuarantinedPrice], None] | None = None,
 ) -> list[ScrapedPriceT]:
+    """参照価格から大きく外れた観測を除外する。
+
+    quarantine_recorder を渡すと、除外した観測が理由付きで検疫に記録される (F4)。
+    除外の事実を残すことで、ストア側の HTML 構造変化によるスクレイパー劣化や
+    誤除外を後から検証できる。
+    """
     threshold_min = reference_price * threshold_ratio_min
     threshold_max = reference_price * threshold_ratio_max
     filtered: list[ScrapedPriceT] = []
+    excluded_count = 0
 
     for price in prices:
         if price.price < threshold_min or price.price > threshold_max:
+            excluded_count += 1
+            if quarantine_recorder is not None:
+                reason = (
+                    "below_min_threshold" if price.price < threshold_min else "above_max_threshold"
+                )
+                quarantine_recorder(
+                    QuarantinedPrice(
+                        product_name=product_name,
+                        store_name=store_name,
+                        price=price.price,
+                        reference_price=reference_price,
+                        reason=reason,
+                        title=getattr(price, "title", None),
+                        url=getattr(price, "url", None),
+                    )
+                )
             continue
         filtered.append(price)
+
+    if excluded_count > 0:
+        logger.info(
+            "%s: %s - 異常価格を %d 件除外 (参照価格 %s 円の %s〜%s 倍の範囲外)",
+            store_name,
+            product_name,
+            excluded_count,
+            f"{reference_price:,}",
+            threshold_ratio_min,
+            threshold_ratio_max,
+        )
 
     return filtered
 
 
-def filter_by_color_label(
+def filter_by_color_label[ScrapedPriceT: _HasPrice](
     prices: list[ScrapedPriceT],
     color_label: str,
     color_family: str,
@@ -441,7 +470,7 @@ def filter_by_color_label(
     return filtered
 
 
-def filter_by_product_name_profile(
+def filter_by_product_name_profile[ScrapedPriceT: _HasPrice](
     prices: list[ScrapedPriceT],
     product_name: str,
     store_name: str,
@@ -454,17 +483,9 @@ def filter_by_product_name_profile(
         product_name=product_name,
         base_rule=profile.product_name_rule,
     )
-    effective_rule = ProductNameRule(
-        required_keywords=base_rule.required_keywords,
-        anchor_keywords=base_rule.anchor_keywords,
-        flea_market_ng_words=base_rule.flea_market_ng_words,
-        condition_ng_words=base_rule.condition_ng_words,
-        partial_item_ng_words=base_rule.partial_item_ng_words,
-        parts_ng_words=base_rule.parts_ng_words,
-        parts_ng_price_threshold=base_rule.parts_ng_price_threshold,
-        exclude_product_names=tuple((*base_rule.exclude_product_names, *(exclude_product_names or []))),
-        exclude_yo_titles=base_rule.exclude_yo_titles,
-        exclude_empty_box_titles=base_rule.exclude_empty_box_titles,
+    effective_rule = dataclasses.replace(
+        base_rule,
+        exclude_product_names=(*base_rule.exclude_product_names, *(exclude_product_names or [])),
     )
     return filter_by_product_name_match(
         prices,
@@ -475,7 +496,7 @@ def filter_by_product_name_profile(
     )
 
 
-def filter_by_color_label_profile(
+def filter_by_color_label_profile[ScrapedPriceT: _HasPrice](
     prices: list[ScrapedPriceT],
     color_label: str,
     color_family: str,
@@ -497,7 +518,9 @@ def filter_by_color_label_profile(
     )
 
 
-class SharedBaseFetcher(ABC, Generic[ProductT, ScrapedPriceT, ConfigT, StoreT]):
+class SharedBaseFetcher[
+    ProductT: _HasName, ScrapedPriceT: _HasPrice, ConfigT: FetcherConfigProtocol, StoreT
+](ABC):
     """HTTP / WebDriver を併用する取得基底クラス。"""
 
     store_type: StoreT

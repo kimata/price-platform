@@ -58,7 +58,9 @@ def require_api_token(
 
             payload = verify_api_token(token, settings)
             if payload is None:
-                return flask.jsonify({"error": "Invalid or expired API token", "code": "API_TOKEN_INVALID"}), 401
+                return flask.jsonify(
+                    {"error": "Invalid or expired API token", "code": "API_TOKEN_INVALID"}
+                ), 401
 
             return func(*args, **kwargs)
 
@@ -102,7 +104,7 @@ def build_api_token_facade(
     config_getter: Callable[[], SupportsWebappConfig],
     secret_path: Path,
     expiry_sec: int = 180,
-    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET",
+    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET",  # noqa: S107 - 環境変数名であり秘密ではない
 ) -> ApiTokenFacade:
     settings_getter = build_api_token_settings_getter(
         config_getter=config_getter,

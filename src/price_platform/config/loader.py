@@ -60,7 +60,7 @@ def warn_unknown_keys(data: dict[str, Any], known_keys: set[str], section_name: 
         logger.warning("Unknown key '%s' in %s section%s", key, section_name, hint)
 
 
-def load_app_config(
+def load_app_config[ConfigT: AppConfig](
     config_cls: type[ConfigT],
     *,
     env_var_name: str,
@@ -78,7 +78,7 @@ def load_app_config(
     )
 
 
-def load_app_config_for(
+def load_app_config_for[ConfigT: AppConfig](
     config_cls: type[ConfigT],
     spec: AppConfigSpec,
     *,
@@ -107,7 +107,7 @@ def load_app_config_for(
     )
 
 
-def parse_app_config(
+def parse_app_config[ConfigT: AppConfig](
     config_cls: type[ConfigT],
     data: dict[str, Any],
     *,
@@ -126,7 +126,7 @@ def parse_app_config(
     )
 
 
-def parse_app_config_for(
+def parse_app_config_for[ConfigT: AppConfig](
     config_cls: type[ConfigT],
     spec: AppConfigSpec,
     data: dict[str, Any],
@@ -157,7 +157,9 @@ def parse_app_config_for(
         database=DatabaseConfig.parse(data["database"], base_dir=base_dir),
         webapp=webapp,
         metrics=MetricsConfig.parse(data["metrics"], base_dir=base_dir),
-        liveness=LivenessConfig.parse(data["liveness"], default_file=spec.default_liveness_file, base_dir=base_dir),
+        liveness=LivenessConfig.parse(
+            data["liveness"], default_file=spec.default_liveness_file, base_dir=base_dir
+        ),
         product_catalog_path=_resolve_path(data["product_catalog_path"], base_dir=base_dir),
         cache=CacheConfig.parse(data["cache"], base_dir=base_dir),
         notification=NotificationConfig.parse(data.get("notification"), base_dir=base_dir),

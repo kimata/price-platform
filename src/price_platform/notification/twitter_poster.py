@@ -33,22 +33,40 @@ class TwitterRateLimit:
     user_remaining: int  # x-user-limit-24hour-remaining
     user_reset: datetime  # x-user-limit-24hour-reset (converted)
 
+    _REQUIRED_HEADERS = (
+        "x-app-limit-24hour-limit",
+        "x-app-limit-24hour-remaining",
+        "x-app-limit-24hour-reset",
+        "x-user-limit-24hour-limit",
+        "x-user-limit-24hour-remaining",
+        "x-user-limit-24hour-reset",
+    )
+
     @classmethod
     def from_headers(cls, headers: dict[str, str]) -> TwitterRateLimit | None:
-        """Extract rate limit info from HTTP response headers."""
+        """Extract rate limit info from HTTP response headers.
+
+        必須ヘッダが 1 つでも欠けている場合は None を返す。
+        欠落を "0" で補うと epoch(1970) の reset を持つ偽のレート制限状態になり、
+        待機時間の計算が 60 秒に潰れて 429 へ再突撃し続ける (B5)。
+        15 分ウィンドウの 429 には 24 時間系ヘッダが付かないため、
+        None を返して呼び出し側のフォールバック待機に委ねる。
+        """
+        if any(name not in headers for name in cls._REQUIRED_HEADERS):
+            return None
         try:
             tz = clock.get_zoneinfo()
             return cls(
-                app_limit=int(headers.get("x-app-limit-24hour-limit", "0")),
-                app_remaining=int(headers.get("x-app-limit-24hour-remaining", "0")),
+                app_limit=int(headers["x-app-limit-24hour-limit"]),
+                app_remaining=int(headers["x-app-limit-24hour-remaining"]),
                 app_reset=datetime.fromtimestamp(
-                    int(headers.get("x-app-limit-24hour-reset", "0")),
+                    int(headers["x-app-limit-24hour-reset"]),
                     tz=tz,
                 ),
-                user_limit=int(headers.get("x-user-limit-24hour-limit", "0")),
-                user_remaining=int(headers.get("x-user-limit-24hour-remaining", "0")),
+                user_limit=int(headers["x-user-limit-24hour-limit"]),
+                user_remaining=int(headers["x-user-limit-24hour-remaining"]),
                 user_reset=datetime.fromtimestamp(
-                    int(headers.get("x-user-limit-24hour-reset", "0")),
+                    int(headers["x-user-limit-24hour-reset"]),
                     tz=tz,
                 ),
             )

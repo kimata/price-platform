@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS webpush_subscriptions (
     product_filter    TEXT,
     created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     last_used_at      TIMESTAMPTZ,
-    is_active         BOOLEAN DEFAULT TRUE
+    is_active         BOOLEAN DEFAULT TRUE,
+    consecutive_failure_count INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_endpoint ON webpush_subscriptions(endpoint);

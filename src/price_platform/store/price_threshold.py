@@ -16,7 +16,7 @@ class SupportsPriceThreshold(Protocol):
     price_min: int
 
 
-def load_price_threshold_map(
+def load_price_threshold_map[ThresholdT: "SupportsPriceThreshold"](
     *,
     threshold_path: Path,
     schema_path: Path,

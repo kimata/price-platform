@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import logging
-import statistics
 from datetime import timedelta
 
-from ._client_metrics_sqlite_models import ClientPerfRaw, DeviceType, MetricName, _date_lt, _date_range
-from ._sqlite_protocols import ClientMetricsAggregateProvider, SQLiteConnectionProvider
-from .platform import clock
+from ..._sqlite_protocols import ClientMetricsAggregateProvider, SQLiteConnectionProvider
+from ...platform import clock
+from .models import ClientPerfRaw, DeviceType, MetricName, _date_lt, _date_range
+from .quartiles import compute_quartiles
 
 logger = logging.getLogger(__name__)
 
@@ -61,16 +61,9 @@ class ClientMetricsWriteMixin:
                     if not values:
                         continue
 
-                    sorted_values = sorted(values)
-                    n = len(sorted_values)
-                    min_val = sorted_values[0]
-                    max_val = sorted_values[-1]
-                    median_val = statistics.median(sorted_values)
-                    avg_val = statistics.mean(values)
-                    q1_idx = n // 4
-                    q3_idx = (3 * n) // 4
-                    q1_val = sorted_values[q1_idx] if q1_idx < n else min_val
-                    q3_val = sorted_values[q3_idx] if q3_idx < n else max_val
+                    quartiles = compute_quartiles(values)
+                    if quartiles is None:
+                        continue
 
                     conn.execute(
                         """
@@ -92,13 +85,13 @@ class ClientMetricsWriteMixin:
                             date,
                             device_type,
                             metric_name,
-                            min_val,
-                            q1_val,
-                            median_val,
-                            q3_val,
-                            max_val,
-                            avg_val,
-                            n,
+                            quartiles.min_val,
+                            quartiles.q1,
+                            quartiles.median,
+                            quartiles.q3,
+                            quartiles.max_val,
+                            quartiles.avg,
+                            quartiles.count,
                         ),
                     )
                     aggregated_count += 1

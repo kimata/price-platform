@@ -4,16 +4,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Generic
+from typing import Any
 
 from price_platform.platform import clock
 
-from ._price_event_types import PriceContext, PriceEventConfig, PriceRecordT, PriceStoreProtocol, SoldRecordT
+from ._price_event_types import (
+    PriceContext,
+    PriceEventConfig,
+    PriceRecordProtocol,
+    PriceStoreProtocol,
+    SoldRecordProtocol,
+)
 from ._price_statistics import build_daily_price_points
 
 
 @dataclass(frozen=True)
-class PriceContextBuilder(Generic[PriceRecordT, SoldRecordT]):
+class PriceContextBuilder[
+    PriceRecordT: PriceRecordProtocol[Any],
+    SoldRecordT: SoldRecordProtocol,
+]:
     price_store: PriceStoreProtocol[PriceRecordT, SoldRecordT]
     config: PriceEventConfig
 
@@ -26,14 +35,16 @@ class PriceContextBuilder(Generic[PriceRecordT, SoldRecordT]):
     ) -> PriceContext[PriceRecordT, SoldRecordT]:
         new_prices = [p for p in current_prices if not p.is_used]
         used_prices = [p for p in current_prices if p.is_used]
+        # 各ルールが参照する窓日数をすべて個別に含める。
+        # max() だけを入れると price_drop_baseline_window_days (デフォルト 14) 等の
+        # キーが欠落し、ルール側の stable_price_history.get(days, []) が常に空になり
+        # イベントが一切検出されなくなる (B1)。
         history_days = {
             7,
             30,
-            max(
-                self.config.rarity_window_days,
-                self.config.price_drop_baseline_window_days,
-                self.config.price_recovery_window_days,
-            ),
+            self.config.rarity_window_days,
+            self.config.price_drop_baseline_window_days,
+            self.config.price_recovery_window_days,
         }
         history_days.update(self.config.period_low_days)
         full_history = self.price_store.get_price_history(

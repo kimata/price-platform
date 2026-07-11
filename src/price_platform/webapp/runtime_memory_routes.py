@@ -9,7 +9,7 @@ from typing import Protocol
 import flask
 
 from price_platform.managers.pod_memory_tracker import MemorySeriesSnapshot
-from price_platform.memory_svg import generate_memory_usage_svg
+from price_platform.metrics.render.memory_svg import generate_memory_usage_svg
 
 
 class SupportsMemorySnapshot(Protocol):

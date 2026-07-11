@@ -96,7 +96,9 @@ def test_check_statistical_low_emits_rarity_event() -> None:
     ctx = _build_context(
         now=now,
         current=current,
-        full_new_history=[DummyPriceRecord(price=point.price, recorded_at=point.recorded_at) for point in stable_history],
+        full_new_history=[
+            DummyPriceRecord(price=point.price, recorded_at=point.recorded_at) for point in stable_history
+        ],
         stable_history_by_days={365: stable_history},
         all_time_lowest_new=DummyPriceRecord(price=70, recorded_at=now - timedelta(days=11)),
     )
@@ -121,8 +123,7 @@ def test_check_price_drop_detects_large_immediate_drop() -> None:
     now = datetime(2026, 4, 6, 12, 0, 0)
     current = DummyPriceRecord(price=75, recorded_at=now)
     stable_history = [
-        PriceHistoryPoint(price=100, recorded_at=now - timedelta(days=day + 3))
-        for day in range(14)
+        PriceHistoryPoint(price=100, recorded_at=now - timedelta(days=day + 3)) for day in range(14)
     ]
     full_history = [DummyPriceRecord(price=100, recorded_at=point.recorded_at) for point in stable_history]
     ctx = _build_context(
@@ -171,7 +172,9 @@ def test_check_price_recovery_uses_sustained_days() -> None:
     ctx = _build_context(
         now=now,
         current=current,
-        full_new_history=[DummyPriceRecord(price=point.price, recorded_at=point.recorded_at) for point in stable_history],
+        full_new_history=[
+            DummyPriceRecord(price=point.price, recorded_at=point.recorded_at) for point in stable_history
+        ],
         stable_history_by_days={30: stable_history},
         all_time_lowest_new=DummyPriceRecord(price=80, recorded_at=now - timedelta(days=10)),
     )
@@ -204,7 +207,9 @@ class DummyDetectedEvent:
 def test_keyword_event_factory_filters_unknown_kwargs() -> None:
     now = datetime(2026, 4, 6, 12, 0, 0)
 
-    def build_legacy_event(*, event_type: str, product_id: str, store: str, price: int, url: str | None, recorded_at: datetime) -> DummyDetectedEvent:
+    def build_legacy_event(
+        *, event_type: str, product_id: str, store: str, price: int, url: str | None, recorded_at: datetime
+    ) -> DummyDetectedEvent:
         return DummyDetectedEvent(
             event_type=event_type,
             product_id=product_id,
@@ -219,9 +224,14 @@ def test_keyword_event_factory_filters_unknown_kwargs() -> None:
         _build_context(
             now=now,
             current=DummyPriceRecord(price=70, recorded_at=now),
-            full_new_history=[DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1)) for day in range(120)],
+            full_new_history=[
+                DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1)) for day in range(120)
+            ],
             stable_history_by_days={
-                365: [PriceHistoryPoint(price=100, recorded_at=now - timedelta(days=day + 1)) for day in range(120)]
+                365: [
+                    PriceHistoryPoint(price=100, recorded_at=now - timedelta(days=day + 1))
+                    for day in range(120)
+                ]
             },
             all_time_lowest_new=DummyPriceRecord(price=70, recorded_at=now - timedelta(days=200)),
         ),
@@ -239,14 +249,11 @@ def test_keyword_event_factory_filters_unknown_kwargs() -> None:
 
 def test_keyword_event_factory_passes_through_var_keyword() -> None:
     """**kwargs シグネチャの関数にはフィルタリングせず全引数を渡す."""
-    from typing import Any
 
     now = datetime(2026, 4, 6, 12, 0, 0)
 
     def build_event_via_kwargs(**kwargs: Any) -> DummyDetectedEvent:
-        accepted = {
-            k: v for k, v in kwargs.items() if k in DummyDetectedEvent.__dataclass_fields__
-        }
+        accepted = {k: v for k, v in kwargs.items() if k in DummyDetectedEvent.__dataclass_fields__}
         return DummyDetectedEvent(**accepted)
 
     factory = KeywordEventFactory(build_event_via_kwargs)
@@ -254,9 +261,14 @@ def test_keyword_event_factory_passes_through_var_keyword() -> None:
         _build_context(
             now=now,
             current=DummyPriceRecord(price=70, recorded_at=now),
-            full_new_history=[DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1)) for day in range(120)],
+            full_new_history=[
+                DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1)) for day in range(120)
+            ],
             stable_history_by_days={
-                365: [PriceHistoryPoint(price=100, recorded_at=now - timedelta(days=day + 1)) for day in range(120)]
+                365: [
+                    PriceHistoryPoint(price=100, recorded_at=now - timedelta(days=day + 1))
+                    for day in range(120)
+                ]
             },
             all_time_lowest_new=DummyPriceRecord(price=70, recorded_at=now - timedelta(days=200)),
         ),
@@ -296,13 +308,17 @@ class InMemoryPriceStore:
         self._prices = prices
         self._sold = sold or []
 
-    def _filter(self, records: list[DummyPriceRecord], product_id: str, selection_key: str | None) -> list[DummyPriceRecord]:
+    def _filter(
+        self, records: list[DummyPriceRecord], product_id: str, selection_key: str | None
+    ) -> list[DummyPriceRecord]:
         result = [p for p in records if getattr(p, "product_id", product_id) == product_id]
         if selection_key is not None:
             result = [p for p in result if p.variant_id == selection_key]
         return result
 
-    def get_current_prices(self, product_id: str, *, selection_key: str | None = None) -> list[DummyPriceRecord]:
+    def get_current_prices(
+        self, product_id: str, *, selection_key: str | None = None
+    ) -> list[DummyPriceRecord]:
         current: dict[tuple[str | None, str, bool], DummyPriceRecord] = {}
         for p in self._filter(self._prices, product_id, selection_key):
             key = (p.variant_id, p.store, p.is_used)
@@ -310,23 +326,23 @@ class InMemoryPriceStore:
                 current[key] = p
         return list(current.values())
 
-    def get_price_history(self, product_id: str, days: int, *, selection_key: str | None = None) -> list[DummyPriceRecord]:
+    def get_price_history(
+        self, product_id: str, days: int, *, selection_key: str | None = None
+    ) -> list[DummyPriceRecord]:
         from price_platform.platform import clock
 
         cutoff = clock.now() - timedelta(days=days)
-        return [
-            p for p in self._filter(self._prices, product_id, selection_key)
-            if p.recorded_at >= cutoff
-        ]
+        return [p for p in self._filter(self._prices, product_id, selection_key) if p.recorded_at >= cutoff]
 
-    def get_lowest_price(self, product_id: str, *, is_used: bool, selection_key: str | None = None) -> DummyPriceRecord | None:
-        filtered = [
-            p for p in self._filter(self._prices, product_id, selection_key)
-            if p.is_used == is_used
-        ]
+    def get_lowest_price(
+        self, product_id: str, *, is_used: bool, selection_key: str | None = None
+    ) -> DummyPriceRecord | None:
+        filtered = [p for p in self._filter(self._prices, product_id, selection_key) if p.is_used == is_used]
         return min(filtered, key=lambda p: p.price) if filtered else None
 
-    def get_sold_records(self, product_id: str, *, limit: int = 20, selection_key: str | None = None) -> list[Any]:
+    def get_sold_records(
+        self, product_id: str, *, limit: int = 20, selection_key: str | None = None
+    ) -> list[Any]:
         return self._sold[:limit]
 
 
@@ -336,13 +352,26 @@ class InMemoryEventStore:
     def __init__(self) -> None:
         self._events: list[Any] = []
         self._next_id = 1
+        self.similar_query_selection_keys: list[str | None] = []
+        self.recent_query_selection_keys: list[str | None] = []
 
     def has_recent_similar_price_event(
-        self, product_id: str, store: Any, price: int, days: int = 14, tolerance: int = 100
+        self,
+        product_id: str,
+        store: Any,
+        price: int,
+        days: int = 14,
+        tolerance: int = 100,
+        *,
+        selection_key: str | None = None,
     ) -> bool:
+        self.similar_query_selection_keys.append(selection_key)
         return False
 
-    def get_recent_event_for_product(self, product_id: str, hours: int) -> Any | None:
+    def get_recent_event_for_product(
+        self, product_id: str, hours: int, *, selection_key: str | None = None
+    ) -> Any | None:
+        self.recent_query_selection_keys.append(selection_key)
         return None
 
     def save_event(self, event: Any) -> int:
@@ -398,15 +427,18 @@ def test_detect_events_separates_variants() -> None:
 
     now = clock.now()
 
-    prices: list[DummyPriceRecord] = []
     # variant_A: 100円で安定 (120日分) → 統計的にも安定
-    for day in range(120):
-        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="A"))
+    prices: list[DummyPriceRecord] = [
+        DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="A")
+        for day in range(120)
+    ]
     prices.append(DummyPriceRecord(price=100, recorded_at=now, variant_id="A"))
 
     # variant_B: 100円で安定 (120日分) → 最新のみ50円に値下げ
-    for day in range(120):
-        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B"))
+    prices.extend(
+        DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B")
+        for day in range(120)
+    )
     prices.append(DummyPriceRecord(price=50, recorded_at=now, variant_id="B"))
 
     detector = _make_variant_detector(prices, with_variant_extractor=True)
@@ -424,13 +456,16 @@ def test_detect_events_without_variant_extractor_mixes_data() -> None:
 
     now = clock.now()
 
-    prices: list[DummyPriceRecord] = []
-    for day in range(120):
-        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="A"))
+    prices: list[DummyPriceRecord] = [
+        DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="A")
+        for day in range(120)
+    ]
     prices.append(DummyPriceRecord(price=100, recorded_at=now, variant_id="A"))
 
-    for day in range(120):
-        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B"))
+    prices.extend(
+        DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B")
+        for day in range(120)
+    )
     prices.append(DummyPriceRecord(price=50, recorded_at=now, variant_id="B"))
 
     detector = _make_variant_detector(prices, with_variant_extractor=False)
@@ -453,15 +488,18 @@ def test_detect_events_variant_isolation_prevents_cross_contamination() -> None:
 
     now = clock.now()
 
-    prices: list[DummyPriceRecord] = []
     # variant_A: 20円で安定 (120日分)
-    for day in range(120):
-        prices.append(DummyPriceRecord(price=20, recorded_at=now - timedelta(days=day + 1), variant_id="A"))
+    prices: list[DummyPriceRecord] = [
+        DummyPriceRecord(price=20, recorded_at=now - timedelta(days=day + 1), variant_id="A")
+        for day in range(120)
+    ]
     prices.append(DummyPriceRecord(price=20, recorded_at=now, variant_id="A"))
 
     # variant_B: 100円で安定 (120日分) → 最新は50円
-    for day in range(120):
-        prices.append(DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B"))
+    prices.extend(
+        DummyPriceRecord(price=100, recorded_at=now - timedelta(days=day + 1), variant_id="B")
+        for day in range(120)
+    )
     prices.append(DummyPriceRecord(price=50, recorded_at=now, variant_id="B"))
 
     detector = _make_variant_detector(prices, with_variant_extractor=True)
@@ -471,3 +509,99 @@ def test_detect_events_variant_isolation_prevents_cross_contamination() -> None:
     variant_b_events = [e for e in events if e.variant_id == "B"]
     assert variant_b_events, "variant_B の統計的異常が検出されるべき"
     assert variant_b_events[0].price == 50
+
+
+# ============================================================
+# B1 回帰: 検出パイプライン統合テスト (builder → rules → suppression)
+# ============================================================
+
+
+def _make_default_detector(
+    prices: list[DummyPriceRecord],
+) -> PriceEventDetector[DummyDetectedEventFull, DummyPriceRecord, Never]:
+    """デフォルト設定 (PriceEventConfig()) の PriceEventDetector を構築する."""
+
+    def event_factory(**kwargs: Any) -> DummyDetectedEventFull:
+        accepted = {k: v for k, v in kwargs.items() if k in DummyDetectedEventFull.__dataclass_fields__}
+        return DummyDetectedEventFull(**accepted)
+
+    return PriceEventDetector(
+        price_store=InMemoryPriceStore(prices),
+        event_store=InMemoryEventStore(),
+        event_types=DummyEventTypes,
+        period_event_map={
+            30: DummyEventType.PERIOD_LOW_30,
+            60: DummyEventType.PERIOD_LOW_60,
+            90: DummyEventType.PERIOD_LOW_90,
+            180: DummyEventType.PERIOD_LOW_180,
+            365: DummyEventType.PERIOD_LOW_365,
+        },
+        flea_market_stores=(),
+        event_factory=event_factory,
+        event_extra_fields=lambda record: {"variant_id": record.variant_id},
+        config=PriceEventConfig(),
+    )
+
+
+def test_price_context_includes_all_configured_window_days() -> None:
+    """B1 回帰: 各ルールの窓日数が個別に stable_price_history のキーになる.
+
+    max() 集約だと price_drop_baseline_window_days (14) 等が欠落し、
+    ルール側が常に空履歴を参照してイベントが検出されなくなる。
+    """
+    from price_platform.platform import clock
+    from price_platform.store._price_event_context import PriceContextBuilder
+
+    now = clock.now()
+    prices = [DummyPriceRecord(price=10000, recorded_at=now - timedelta(days=d)) for d in range(40)]
+    config = PriceEventConfig()
+    builder = PriceContextBuilder(price_store=InMemoryPriceStore(prices), config=config)
+
+    ctx = builder.build("product-1", prices[:1])
+
+    assert config.price_drop_baseline_window_days in ctx.stable_price_history
+    assert config.price_recovery_window_days in ctx.stable_price_history
+    assert config.rarity_window_days in ctx.stable_price_history
+    for days in config.period_low_days:
+        assert days in ctx.stable_price_history
+
+
+def test_detect_events_pipeline_detects_price_drop_with_default_config() -> None:
+    """B1 回帰: デフォルト設定のまま detector 経由で PRICE_DROP が検出される.
+
+    14 日以上安定していた価格が大幅下落したとき、手組みコンテキストではなく
+    detector → PriceContextBuilder → rules の実経路で検出できることを確認する。
+    """
+    from price_platform.platform import clock
+
+    now = clock.now()
+    prices = [DummyPriceRecord(price=10000, recorded_at=now - timedelta(days=day + 1)) for day in range(30)]
+    prices.append(DummyPriceRecord(price=7000, recorded_at=now))  # 30% 下落
+
+    detector = _make_default_detector(prices)
+    current = detector.price_store.get_current_prices("product-1")
+    events = detector.detect_events_only("product-1", current)
+
+    assert any(event.event_type == DummyEventType.PRICE_DROP for event in events), (
+        f"PRICE_DROP が検出されない (B1 再発): {[e.event_type for e in events]}"
+    )
+
+
+def test_detect_events_passes_selection_key_to_suppression() -> None:
+    """B4 回帰: 抑制層への照会にバリアントの selection_key が伝播する."""
+    from price_platform.platform import clock
+
+    now = clock.now()
+    prices = [
+        DummyPriceRecord(price=10000, recorded_at=now - timedelta(days=day + 1), variant_id="B")
+        for day in range(30)
+    ]
+    prices.append(DummyPriceRecord(price=7000, recorded_at=now, variant_id="B"))
+
+    detector = _make_variant_detector(prices, with_variant_extractor=True)
+    events = detector.detect_events("product-1")
+
+    assert events, "イベントが検出されない"
+    event_store = detector.event_store
+    assert "B" in event_store.similar_query_selection_keys
+    assert "B" in event_store.recent_query_selection_keys

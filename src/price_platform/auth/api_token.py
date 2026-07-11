@@ -26,7 +26,7 @@ def build_standard_api_token_facade(
     config_getter,
     secret_path: Path = DEFAULT_API_TOKEN_SECRET_PATH,
     expiry_sec: int = DEFAULT_API_TOKEN_EXPIRY_SEC,
-    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET",
+    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET",  # noqa: S107 - 環境変数名であり秘密ではない
 ) -> ApiTokenFacade:
     """Build the conventional API token facade used by consumer apps."""
     return build_api_token_facade(

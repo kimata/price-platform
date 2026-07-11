@@ -10,7 +10,13 @@ import threading
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
-from ._client_metrics_sqlite_models import (
+from ..._singleton import SingletonHolder
+from ...migrations import build_client_metrics_migrations
+from ...schema_registry import resolve_schema_path
+from ...sqlite_store import SQLiteStoreBase
+from ..render.boxplot_svg import generate_boxplot_svg
+from .boxplot import ClientMetricsBoxplotMixin
+from .models import (
     BoxplotData,
     ClientPerfDaily,
     ClientPerfRaw,
@@ -23,14 +29,9 @@ from ._client_metrics_sqlite_models import (
     WebVitalRaw,
     detect_device_type,
 )
-from .client_metrics_boxplot import ClientMetricsBoxplotMixin
-from .client_metrics_social_referrals import ClientMetricsSocialReferralMixin
-from .client_metrics_svg import generate_boxplot_svg
-from .client_metrics_web_vitals import ClientMetricsWebVitalsReadMixin, ClientMetricsWebVitalsWriteMixin
-from .client_metrics_writes import ClientMetricsWriteMixin
-from .migrations import build_client_metrics_migrations
-from .schema_registry import resolve_schema_path
-from .sqlite_store import SQLiteStoreBase
+from .social_referrals import ClientMetricsSocialReferralMixin
+from .web_vitals import ClientMetricsWebVitalsReadMixin, ClientMetricsWebVitalsWriteMixin
+from .writes import ClientMetricsWriteMixin
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +64,8 @@ class ClientMetricsDB(
 
     @contextmanager
     def _get_connection(self) -> collections.abc.Iterator[sqlite3.Connection]:
-        with self._lock:
-            with self.connection() as conn:
-                yield conn
+        with self._lock, self.connection() as conn:
+            yield conn
 
 
 def open_client_metrics_db(db_path: pathlib.Path) -> ClientMetricsDB:
@@ -73,27 +73,24 @@ def open_client_metrics_db(db_path: pathlib.Path) -> ClientMetricsDB:
     return ClientMetricsDB(db_path)
 
 
-_client_metrics_db: ClientMetricsDB | None = None
+_client_metrics_db_holder: SingletonHolder[ClientMetricsDB] = SingletonHolder(
+    "ClientMetricsDB", "init_client_metrics_db()"
+)
 
 
 def get_client_metrics_db() -> ClientMetricsDB:
     """Return the global client metrics database instance."""
-    if _client_metrics_db is None:
-        raise RuntimeError("ClientMetricsDB not initialized. Call init_client_metrics_db() first.")
-    return _client_metrics_db
+    return _client_metrics_db_holder.get()
 
 
 def init_client_metrics_db(db_path: pathlib.Path) -> ClientMetricsDB:
     """Initialize and return the global client metrics database instance."""
-    global _client_metrics_db
-    _client_metrics_db = open_client_metrics_db(db_path)
-    return _client_metrics_db
+    return _client_metrics_db_holder.set(open_client_metrics_db(db_path))
 
 
 def _reset_client_metrics_db() -> None:
     """Reset the global client metrics database instance for tests."""
-    global _client_metrics_db
-    _client_metrics_db = None
+    _client_metrics_db_holder.reset()
 
 __all__ = [
     "BoxplotData",

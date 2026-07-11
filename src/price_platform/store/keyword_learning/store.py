@@ -46,11 +46,13 @@ class KeywordLearningStore(SQLiteStoreBase):
                 conn.execute(
                     """
                     INSERT OR IGNORE INTO listing_observations (
-                        project, product_id, product_name, store_name, listing_url, listing_title, listing_price,
+                        project, product_id, product_name, store_name, listing_url,
+                        listing_title, listing_price,
                         admitted, reason, missing_keywords_json, matched_ng_words_json,
                         matched_partial_item_words_json, matched_parts_words_json,
                         matched_exclude_product_name, required_keywords_json, anchor_keywords_json,
-                        exclude_product_names_json, reference_price, title_normalized, captured_at, observation_day
+                        exclude_product_names_json, reference_price, title_normalized,
+                        captured_at, observation_day
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
@@ -117,7 +119,8 @@ class KeywordLearningStore(SQLiteStoreBase):
                     reviewed_at, created_at
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(project, product_id, kind, payload_json, analysis_window_start, analysis_window_end)
+                ON CONFLICT(project, product_id, kind, payload_json,
+                            analysis_window_start, analysis_window_end)
                 DO UPDATE SET
                     metrics_json = excluded.metrics_json,
                     evidence_json = excluded.evidence_json,
@@ -135,8 +138,12 @@ class KeywordLearningStore(SQLiteStoreBase):
                     serialize_json_payload(proposal.payload),
                     json.dumps(proposal.metrics, ensure_ascii=True, sort_keys=True),
                     json.dumps(proposal.evidence, ensure_ascii=True, sort_keys=True),
-                    proposal.analysis_window.started_at.isoformat() if proposal.analysis_window.started_at else None,
-                    proposal.analysis_window.ended_at.isoformat() if proposal.analysis_window.ended_at else None,
+                    proposal.analysis_window.started_at.isoformat()
+                    if proposal.analysis_window.started_at
+                    else None,
+                    proposal.analysis_window.ended_at.isoformat()
+                    if proposal.analysis_window.ended_at
+                    else None,
                     proposal.score,
                     proposal.status.value,
                     proposal.reviewer,
@@ -201,9 +208,7 @@ class KeywordLearningStore(SQLiteStoreBase):
         with self.connection() as conn:
             run_rows = conn.execute(query, params).fetchall()
         run_payloads = [
-            payloads
-            for row in run_rows
-            if (payloads := set(json.loads(row["candidate_payloads_json"])))
+            payloads for row in run_rows if (payloads := set(json.loads(row["candidate_payloads_json"])))
         ]
 
         active_counts: dict[str, int] = {}

@@ -6,7 +6,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 import selenium.common.exceptions
 
@@ -24,7 +24,7 @@ class ItemTimingProtocol(Protocol):
 
 
 @dataclass(frozen=True)
-class ScrapeRetryOutcome(Generic[PriceT]):
+class ScrapeRetryOutcome[PriceT]:
     """Normalized scrape retry result."""
 
     prices: list[PriceT]
@@ -32,7 +32,7 @@ class ScrapeRetryOutcome(Generic[PriceT]):
     error_message: str | None = None
 
 
-def run_scrape_with_retry(
+def run_scrape_with_retry[PriceT](
     *,
     execute: Callable[[], list[PriceT]],
     store_name: str,

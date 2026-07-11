@@ -7,7 +7,9 @@ import sqlite3
 import statistics
 from datetime import timedelta
 
-from ._client_metrics_sqlite_models import (
+from ..._sqlite_protocols import ClientMetricsWebVitalsProvider, SQLiteConnectionProvider
+from ...platform import clock
+from .models import (
     DeviceType,
     WebVitalBoxplotData,
     WebVitalName,
@@ -17,8 +19,7 @@ from ._client_metrics_sqlite_models import (
     _date_range,
     _filter_web_vital_values,
 )
-from ._sqlite_protocols import ClientMetricsWebVitalsProvider, SQLiteConnectionProvider
-from .platform import clock
+from .quartiles import compute_quartiles
 
 logger = logging.getLogger(__name__)
 
@@ -72,16 +73,9 @@ class ClientMetricsWebVitalsWriteMixin:
                     if not values:
                         continue
 
-                    sorted_values = sorted(values)
-                    n = len(sorted_values)
-                    min_val = sorted_values[0]
-                    max_val = sorted_values[-1]
-                    median_val = statistics.median(sorted_values)
-                    avg_val = statistics.mean(values)
-                    q1_idx = n // 4
-                    q3_idx = (3 * n) // 4
-                    q1_val = sorted_values[q1_idx] if q1_idx < n else min_val
-                    q3_val = sorted_values[q3_idx] if q3_idx < n else max_val
+                    quartiles = compute_quartiles(values)
+                    if quartiles is None:
+                        continue
                     good_count = sum(1 for r in ratings if r == "good")
                     needs_improvement_count = sum(1 for r in ratings if r == "needs-improvement")
                     poor_count = sum(1 for r in ratings if r == "poor")
@@ -110,13 +104,13 @@ class ClientMetricsWebVitalsWriteMixin:
                             date,
                             device_type,
                             metric_name,
-                            min_val,
-                            q1_val,
-                            median_val,
-                            q3_val,
-                            max_val,
-                            avg_val,
-                            n,
+                            quartiles.min_val,
+                            quartiles.q1,
+                            quartiles.median,
+                            quartiles.q3,
+                            quartiles.max_val,
+                            quartiles.avg,
+                            quartiles.count,
                             good_count,
                             needs_improvement_count,
                             poor_count,
@@ -182,7 +176,9 @@ class ClientMetricsWebVitalsReadMixin:
             for date_str in realtime_dates:
                 for device_type in device_types:
                     if (date_str, device_type) not in aggregated_date_device_pairs:
-                        stats = self._compute_web_vital_stats_for_date(conn, date_str, metric_name, device_type)
+                        stats = self._compute_web_vital_stats_for_date(
+                            conn, date_str, metric_name, device_type
+                        )
                         if stats:
                             result.append(stats)
 
@@ -215,16 +211,9 @@ class ClientMetricsWebVitalsReadMixin:
         if not values:
             return None
 
-        sorted_values = sorted(values)
-        n = len(sorted_values)
-        min_val = sorted_values[0]
-        max_val = sorted_values[-1]
-        median_val = statistics.median(sorted_values)
-        avg_val = statistics.mean(values)
-        q1_idx = n // 4
-        q3_idx = (3 * n) // 4
-        q1_val = sorted_values[q1_idx] if q1_idx < n else min_val
-        q3_val = sorted_values[q3_idx] if q3_idx < n else max_val
+        quartiles = compute_quartiles(values)
+        if quartiles is None:
+            return None
         good_count = sum(1 for r in ratings if r == "good")
         needs_improvement_count = sum(1 for r in ratings if r == "needs-improvement")
         poor_count = sum(1 for r in ratings if r == "poor")
@@ -233,16 +222,18 @@ class ClientMetricsWebVitalsReadMixin:
             date=date_str,
             device_type=device_type,
             metric_name=metric_name,
-            min_val=min_val,
-            q1=q1_val,
-            median=median_val,
-            q3=q3_val,
-            max_val=max_val,
-            avg=avg_val,
-            count=n,
-            good_pct=(good_count / n * 100) if n > 0 else 0,
-            needs_improvement_pct=(needs_improvement_count / n * 100) if n > 0 else 0,
-            poor_pct=(poor_count / n * 100) if n > 0 else 0,
+            min_val=quartiles.min_val,
+            q1=quartiles.q1,
+            median=quartiles.median,
+            q3=quartiles.q3,
+            max_val=quartiles.max_val,
+            avg=quartiles.avg,
+            count=quartiles.count,
+            good_pct=(good_count / quartiles.count * 100) if quartiles.count > 0 else 0,
+            needs_improvement_pct=(needs_improvement_count / quartiles.count * 100)
+            if quartiles.count > 0
+            else 0,
+            poor_pct=(poor_count / quartiles.count * 100) if quartiles.count > 0 else 0,
         )
 
     def get_web_vitals_summary(

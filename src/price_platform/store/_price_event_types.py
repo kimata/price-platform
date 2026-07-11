@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 StoreTypeT = TypeVar("StoreTypeT")
 StoreTypeT_co = TypeVar("StoreTypeT_co", covariant=True)
@@ -57,8 +57,12 @@ class PriceEventStoreProtocol(Protocol[PriceEventT]):
         price: int,
         days: int = 14,
         tolerance: int = 100,
+        *,
+        selection_key: str | None = None,
     ) -> bool: ...
-    def get_recent_event_for_product(self, product_id: str, hours: int) -> PriceEventT | None: ...
+    def get_recent_event_for_product(
+        self, product_id: str, hours: int, *, selection_key: str | None = None
+    ) -> PriceEventT | None: ...
     def save_event(self, event: PriceEventT) -> int: ...
     def suppress_event(self, event_id: int, superseded_by: int) -> None: ...
 
@@ -143,7 +147,7 @@ class DetectedPriceEventProtocol(Protocol):
 
 
 @dataclass
-class PriceContext(Generic[PriceRecordT, SoldRecordT]):
+class PriceContext[PriceRecordT: "PriceRecordProtocol[Any]", SoldRecordT: "SoldRecordProtocol"]:
     """Aggregated price data for event detection."""
 
     product_id: str

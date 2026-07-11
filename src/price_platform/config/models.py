@@ -162,7 +162,9 @@ class WebAppDataConfig:
             log_file_path=_resolve_path(data["log_file_path"], base_dir=base_dir)
             if "log_file_path" in data
             else None,
-            stat_dir_path=_resolve_path(data["stat_dir_path"], base_dir=base_dir) if "stat_dir_path" in data else None,
+            stat_dir_path=_resolve_path(data["stat_dir_path"], base_dir=base_dir)
+            if "stat_dir_path" in data
+            else None,
         )
 
 
@@ -201,7 +203,9 @@ class MetricsAuthConfig:
         return cls(
             enabled=data.get("enabled", False),
             password_hash=data.get("password_hash", ""),
-            jwt_secret_path=_resolve_path(data.get("jwt_secret_path", "data/jwt_secret.key"), base_dir=base_dir),
+            jwt_secret_path=_resolve_path(
+                data.get("jwt_secret_path", "data/jwt_secret.key"), base_dir=base_dir
+            ),
             jwt_expiry_hours=data.get("jwt_expiry_hours", 24),
         )
 

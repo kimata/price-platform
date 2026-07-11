@@ -25,55 +25,6 @@ from ._price_statistics import (
 logger = logging.getLogger(__name__)
 
 
-def build_event_draft(
-    record: PriceRecordProtocol[Any],
-    *,
-    event_type: Any,
-    product_id: str,
-    recorded_at: datetime,
-    extra_fields: dict[str, object | None],
-    previous_price: int | None = None,
-    reference_price: int | None = None,
-    change_percent: float | None = None,
-    period_days: int | None = None,
-    percentile_rank: float | None = None,
-    rarity_tier: str | None = None,
-    baseline_price: int | None = None,
-    sample_days: int | None = None,
-    sample_count: int | None = None,
-    rarity_window_days: int | None = None,
-    detector_version: str | None = None,
-    canonical_variant_key: str | None = None,
-    event_family: str | None = None,
-    comparison_basis: str | None = None,
-    severity: str | None = None,
-) -> PriceEventDraft:
-    return PriceEventDraft(
-        event_type=event_type,
-        product_id=product_id,
-        store=record.store,
-        price=record.price,
-        url=record.url,
-        recorded_at=recorded_at,
-        previous_price=previous_price,
-        reference_price=reference_price,
-        change_percent=change_percent,
-        period_days=period_days,
-        percentile_rank=percentile_rank,
-        rarity_tier=rarity_tier,
-        baseline_price=baseline_price,
-        sample_days=sample_days,
-        sample_count=sample_count,
-        rarity_window_days=rarity_window_days,
-        detector_version=detector_version,
-        canonical_variant_key=canonical_variant_key,
-        event_family=event_family,
-        comparison_basis=comparison_basis,
-        severity=severity,
-        extra_fields=extra_fields,
-    )
-
-
 def check_all_time_low(
     ctx: PriceContext[PriceRecordT, SoldRecordT],
     current: PriceRecordT,
@@ -86,12 +37,16 @@ def check_all_time_low(
     lowest = ctx.all_time_lowest_new
     if lowest is None or current.price >= lowest.price:
         return None
-    quality = assess_data_quality(ctx.stable_full_new_price_history, window_days=max(365, config.all_time_low_min_days))
+    quality = assess_data_quality(
+        ctx.stable_full_new_price_history, window_days=max(365, config.all_time_low_min_days)
+    )
     if quality.distinct_observation_days < config.all_time_low_min_days:
         return None
     logger.info("[ALL_TIME_LOW] %s: %s円 < %s円", ctx.product_id, f"{current.price:,}", f"{lowest.price:,}")
-    return build_event_draft(
-        current,
+    return PriceEventDraft(
+        store=current.store,
+        price=current.price,
+        url=current.url,
         event_type=event_types.ALL_TIME_LOW,
         product_id=ctx.product_id,
         previous_price=lowest.price,
@@ -133,9 +88,13 @@ def check_period_low(
             if avg_price > 0:
                 change_percent = (current.price - avg_price) / avg_price * 100
 
-        logger.info("[PERIOD_LOW_%s] %s: %s円 < %s円", days, ctx.product_id, f"{current.price:,}", f"{lowest.price:,}")
-        return build_event_draft(
-            current,
+        logger.info(
+            "[PERIOD_LOW_%s] %s: %s円 < %s円", days, ctx.product_id, f"{current.price:,}", f"{lowest.price:,}"
+        )
+        return PriceEventDraft(
+            store=current.store,
+            price=current.price,
+            url=current.url,
             event_type=event_type,
             product_id=ctx.product_id,
             previous_price=lowest.price,
@@ -193,8 +152,10 @@ def check_statistical_low(
         percentile_rank,
         rarity.tier.value,
     )
-    return build_event_draft(
-        current,
+    return PriceEventDraft(
+        store=current.store,
+        price=current.price,
+        url=current.url,
         event_type=event_type,
         product_id=ctx.product_id,
         recorded_at=now,
@@ -270,8 +231,10 @@ def check_price_drop(
         f"{baseline:,.0f}",
         f"{current.price:,}",
     )
-    return build_event_draft(
-        current,
+    return PriceEventDraft(
+        store=current.store,
+        price=current.price,
+        url=current.url,
         event_type=event_types.PRICE_DROP,
         product_id=ctx.product_id,
         previous_price=int(baseline),
@@ -305,9 +268,17 @@ def check_good_used_deal(
     ratio = used.price / new_price
     if ratio > config.good_used_ratio_max:
         return None
-    logger.info("[GOOD_USED_DEAL] %s: 中古%s円 / 新品%s円 = %.1f%%", product_id, f"{used.price:,}", f"{new_price:,}", ratio * 100)
-    return build_event_draft(
-        used,
+    logger.info(
+        "[GOOD_USED_DEAL] %s: 中古%s円 / 新品%s円 = %.1f%%",
+        product_id,
+        f"{used.price:,}",
+        f"{new_price:,}",
+        ratio * 100,
+    )
+    return PriceEventDraft(
+        store=used.store,
+        price=used.price,
+        url=used.url,
         event_type=event_types.GOOD_USED_DEAL,
         product_id=product_id,
         reference_price=new_price,
@@ -346,8 +317,10 @@ def check_flea_bargain(
         f"{median_price:,}",
         discount_percent,
     )
-    return build_event_draft(
-        current,
+    return PriceEventDraft(
+        store=current.store,
+        price=current.price,
+        url=current.url,
         event_type=event_types.FLEA_BARGAIN,
         product_id=ctx.product_id,
         reference_price=median_price,
@@ -405,8 +378,10 @@ def check_price_recovery(
         recovery_percent,
         recovered_days,
     )
-    return build_event_draft(
-        current,
+    return PriceEventDraft(
+        store=current.store,
+        price=current.price,
+        url=current.url,
         event_type=event_types.PRICE_RECOVERY,
         product_id=ctx.product_id,
         previous_price=lowest.price,

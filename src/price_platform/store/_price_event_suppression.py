@@ -17,7 +17,9 @@ def _event_label(event: DetectedPriceEventProtocol) -> str:
     return getattr(event.event_type, "label", str(event.event_type))
 
 
-def _is_same_state(existing: DetectedPriceEventProtocol, candidate: DetectedPriceEventProtocol, tolerance: int) -> bool:
+def _is_same_state(
+    existing: DetectedPriceEventProtocol, candidate: DetectedPriceEventProtocol, tolerance: int
+) -> bool:
     existing_family = getattr(existing, "event_family", None)
     candidate_family = getattr(candidate, "event_family", None)
     if existing_family and candidate_family and existing_family != candidate_family:
@@ -37,6 +39,7 @@ def apply_event_suppression(
     product_id: str,
     detected: list[_EventT],
     config: PriceEventConfig,
+    selection_key: str | None = None,
 ) -> list[_EventT]:
     if not detected:
         return []
@@ -48,6 +51,7 @@ def apply_event_suppression(
         best_new.price,
         days=config.same_price_suppression_days,
         tolerance=config.same_price_tolerance,
+        selection_key=selection_key,
     ):
         logger.debug(
             "類似価格イベント抑制（%s日以内）: %s - %s",
@@ -57,7 +61,9 @@ def apply_event_suppression(
         )
         return []
 
-    existing = event_store.get_recent_event_for_product(product_id, hours=config.suppression_window_hours)
+    existing = event_store.get_recent_event_for_product(
+        product_id, hours=config.suppression_window_hours, selection_key=selection_key
+    )
     if existing is None:
         event_id = event_store.save_event(best_new)
         logger.info("新規イベント保存: %s - %s (ID: %s)", _event_label(best_new), product_id, event_id)
@@ -71,8 +77,12 @@ def apply_event_suppression(
         event_id = event_store.save_event(best_new)
         if existing.id:
             event_store.suppress_event(existing.id, event_id)
-        logger.info("イベント上書き: %s → %s - %s", _event_label(existing), _event_label(best_new), product_id)
+        logger.info(
+            "イベント上書き: %s → %s - %s", _event_label(existing), _event_label(best_new), product_id
+        )
         return [replace(best_new, id=event_id)]  # type: ignore[type-var]  # ty: ignore[invalid-argument-type]
 
-    logger.debug("イベント抑制: %s (既存: %s) - %s", _event_label(best_new), _event_label(existing), product_id)
+    logger.debug(
+        "イベント抑制: %s (既存: %s) - %s", _event_label(best_new), _event_label(existing), product_id
+    )
     return []

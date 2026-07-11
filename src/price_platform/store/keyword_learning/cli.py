@@ -61,7 +61,7 @@ def _yaml_lines(value: object, indent: int = 0) -> list[str]:
     if isinstance(value, dict):
         lines: list[str] = []
         for key, child in value.items():
-            if isinstance(child, (dict, list)):
+            if isinstance(child, dict | list):
                 lines.append(f"{prefix}{key}:")
                 lines.extend(_yaml_lines(child, indent + 2))
             else:
@@ -70,7 +70,7 @@ def _yaml_lines(value: object, indent: int = 0) -> list[str]:
     if isinstance(value, list):
         lines = []
         for child in value:
-            if isinstance(child, (dict, list)):
+            if isinstance(child, dict | list):
                 lines.append(f"{prefix}-")
                 lines.extend(_yaml_lines(child, indent + 2))
             else:

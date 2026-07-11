@@ -7,6 +7,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any, Protocol
 
+from ._webpush_store_types import DeliveryDailyStats, DeliveryStats
+
 
 class TwitterStoreProtocol(Protocol):
     """Store surface required for Twitter status reporting."""
@@ -23,7 +25,9 @@ class WebPushStatusStoreProtocol(Protocol):
 
     def get_subscription_count(self) -> int: ...
 
-    def get_delivery_stats(self, days: int = 30) -> dict[str, int]: ...
+    def get_delivery_stats(self, days: int = 30) -> DeliveryStats: ...
+
+    def get_delivery_timeseries(self, days: int = 30) -> list[DeliveryDailyStats]: ...
 
     def get_group_subscription_stats(self) -> dict[str, int]: ...
 
@@ -91,10 +95,10 @@ def build_webpush_status_payload(
     """Build Web Push status payload from a Web Push store."""
     elapsed_seconds_factory = elapsed_seconds_factory or (lambda seconds: seconds)
     delivery_stats = store.get_delivery_stats(days=days)
-    total = delivery_stats.get("total", 0)
-    sent = delivery_stats.get("sent", 0)
-    failed = delivery_stats.get("failed", 0)
-    expired = delivery_stats.get("expired", 0)
+    total = delivery_stats.total
+    sent = delivery_stats.sent
+    failed = delivery_stats.failed
+    expired = delivery_stats.expired
 
     grouped_products: defaultdict[str, dict[str, int]] = defaultdict(
         lambda: {"product_count": 0, "subscriber_count": 0}
@@ -116,6 +120,17 @@ def build_webpush_status_payload(
             "expired": expired,
             "success_rate": round((sent / total * 100), 1) if total > 0 else 100.0,
         },
+        # 配信成功率の日次推移 (F3: ダッシュボードで「Push が届いているか」を確認できるように)
+        "delivery_timeseries": [
+            {
+                "date": entry.date,
+                "sent": entry.sent,
+                "failed": entry.failed,
+                "expired": entry.expired,
+                "success_rate": entry.success_rate,
+            }
+            for entry in store.get_delivery_timeseries(days=days)
+        ],
         group_stats_key: store.get_group_subscription_stats(),
         grouped_products_key: dict(grouped_products),
         "days": days,

@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-from ._sqlite_protocols import MetricsRowMapper, SQLiteConnectionProvider
-from .platform import clock
+from ..._sqlite_protocols import MetricsRowMapper, SQLiteConnectionProvider
+from ...platform import clock
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,8 @@ class MetricsDBWriteMixin:
             for row in rows:
                 session_id = row["id"]
                 started_at = datetime.fromisoformat(row["started_at"])
-                ended_at = datetime.fromisoformat(row["last_heartbeat_at"]) if row["last_heartbeat_at"] else now
+                heartbeat = row["last_heartbeat_at"]
+                ended_at = datetime.fromisoformat(heartbeat) if heartbeat else now
                 duration_sec = (ended_at - started_at).total_seconds()
                 conn.execute(
                     """
@@ -190,7 +191,15 @@ class MetricsDBWriteMixin:
                     (session_id, store_name, product_id, started_at, duration_sec, success, error_message)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (session_id, store_name, product_id, started_at.isoformat(), duration_sec, success, error_message),
+                (
+                    session_id,
+                    store_name,
+                    product_id,
+                    started_at.isoformat(),
+                    duration_sec,
+                    success,
+                    error_message,
+                ),
             )
             conn.commit()
 

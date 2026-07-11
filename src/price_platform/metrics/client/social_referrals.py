@@ -2,11 +2,27 @@
 
 from __future__ import annotations
 
+import dataclasses
+from dataclasses import dataclass
 from datetime import timedelta
 
-from ._client_metrics_sqlite_models import SocialReferralEventRaw, _date_gte
-from ._sqlite_protocols import SQLiteConnectionProvider
-from .platform import clock
+from ..._sqlite_protocols import SQLiteConnectionProvider
+from ...platform import clock
+from .models import SocialReferralEventRaw, _date_gte
+
+
+@dataclass(frozen=True)
+class SocialReferralSummary:
+    """SNS 流入イベントの期間集計。"""
+
+    days: int
+    total_events: int
+    variants: dict[str, dict[str, int]]
+    sources: dict[str, int]
+
+    def to_dict(self) -> dict[str, object]:
+        """JSON レスポンス境界用の辞書表現。"""
+        return dataclasses.asdict(self)
 
 
 class ClientMetricsSocialReferralMixin:
@@ -46,7 +62,9 @@ class ClientMetricsSocialReferralMixin:
             )
             conn.commit()
 
-    def get_social_referral_summary(self: SQLiteConnectionProvider, *, days: int = 30) -> dict[str, object]:
+    def get_social_referral_summary(
+        self: SQLiteConnectionProvider, *, days: int = 30
+    ) -> SocialReferralSummary:
         since = _date_gte((clock.now().date() - timedelta(days=max(days - 1, 0))).isoformat())
         with self._get_connection() as conn:
             total = conn.execute(
@@ -82,9 +100,9 @@ class ClientMetricsSocialReferralMixin:
             bucket = variants.setdefault(row["post_variant"], {})
             bucket[row["event_name"]] = row["count"]
 
-        return {
-            "days": days,
-            "total_events": total,
-            "variants": variants,
-            "sources": {row["source"]: row["count"] for row in by_source_rows},
-        }
+        return SocialReferralSummary(
+            days=days,
+            total_events=total,
+            variants=variants,
+            sources={row["source"]: row["count"] for row in by_source_rows},
+        )

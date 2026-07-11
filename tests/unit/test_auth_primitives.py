@@ -90,3 +90,27 @@ def test_password_hash_roundtrip_and_invalid_hash() -> None:
     assert price_platform.auth.password_hash.verify_password("s3cret", password_hash) is True
     assert price_platform.auth.password_hash.verify_password("wrong", password_hash) is False
     assert price_platform.auth.password_hash.verify_password("s3cret", "invalid-hash") is False
+
+
+def test_rate_limiter_sweeps_expired_entries() -> None:
+    """B14 回帰: 期限切れの failures / lockouts が定期スイープで掃除される."""
+    from price_platform.auth.rate_limiter import InMemoryRateLimiter, RateLimitSettings
+
+    current = [1000.0]
+    limiter = InMemoryRateLimiter(
+        RateLimitSettings(failure_window_sec=60, max_failures=100, lockout_duration_sec=60),
+        now_fn=lambda: current[0],
+    )
+
+    # 多数の一見客 IP が 1 回ずつ失敗
+    for i in range(100):
+        limiter.record_failure(f"10.0.0.{i}")
+    assert len(limiter._state.failures) == 100
+
+    # 時間経過後、スイープ間隔を超えるアクセスでエントリが掃除される
+    current[0] += 3600
+    for i in range(130):
+        limiter.record_failure(f"192.168.0.{i}")
+
+    stale = [ip for ip in limiter._state.failures if ip.startswith("10.0.0.")]
+    assert stale == [], f"期限切れエントリが残存: {len(stale)} 件"

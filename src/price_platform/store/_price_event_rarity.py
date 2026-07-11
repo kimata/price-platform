@@ -49,13 +49,25 @@ def resolve_rarity(
 
     if data_quality.coverage_ratio < config.rarity_min_coverage_ratio:
         tier = None
-    elif data_quality.distinct_observation_days >= 90 and upper_bound_percentile <= config.extreme_rarity_max_percentile:
+    elif (
+        data_quality.distinct_observation_days >= 90
+        and upper_bound_percentile <= config.extreme_rarity_max_percentile
+    ):
         tier = RarityTier.EXTREME
-    elif data_quality.distinct_observation_days >= 60 and upper_bound_percentile <= config.very_high_rarity_max_percentile:
+    elif (
+        data_quality.distinct_observation_days >= 60
+        and upper_bound_percentile <= config.very_high_rarity_max_percentile
+    ):
         tier = RarityTier.VERY_HIGH
-    elif data_quality.distinct_observation_days >= 30 and upper_bound_percentile <= config.high_rarity_max_percentile:
+    elif (
+        data_quality.distinct_observation_days >= 30
+        and upper_bound_percentile <= config.high_rarity_max_percentile
+    ):
         tier = RarityTier.HIGH
-    elif data_quality.distinct_observation_days >= 14 and upper_bound_percentile <= config.moderate_rarity_max_percentile:
+    elif (
+        data_quality.distinct_observation_days >= 14
+        and upper_bound_percentile <= config.moderate_rarity_max_percentile
+    ):
         tier = RarityTier.MODERATE
     else:
         tier = None
@@ -65,4 +77,3 @@ def resolve_rarity(
         conservative_percentile_upper_bound=upper_bound_percentile,
         tier=tier,
     )
-

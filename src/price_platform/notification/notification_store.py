@@ -2,67 +2,26 @@
 
 from __future__ import annotations
 
-import collections.abc
 import logging
 import pathlib
-import sqlite3
-from contextlib import contextmanager
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from price_platform.schema_registry import resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
 
+from . import _notification_posting_history_repository as history_repo
+from . import _notification_queue_repository as queue_repo
+from . import _notification_rate_limit_repository as rate_limit_repo
 from ._notification_payload import NotificationPayload, SupportsNotificationEvent, build_notification_payload
-from ._notification_posting_history_repository import (
-    get_last_posted_time as repo_get_last_posted_time,
-)
-from ._notification_posting_history_repository import (
-    get_last_posted_time_for_product as repo_get_last_posted_time_for_product,
-)
-from ._notification_queue_repository import (
-    cleanup_old_items as repo_cleanup_old_items,
-)
-from ._notification_queue_repository import (
-    enqueue_notification,
-    get_pending_notifications,
-)
-from ._notification_queue_repository import (
-    get_pending_count as repo_get_pending_count,
-)
-from ._notification_queue_repository import (
-    increment_retry_count as repo_increment_retry_count,
-)
-from ._notification_queue_repository import (
-    mark_failed as repo_mark_failed,
-)
-from ._notification_queue_repository import (
-    mark_posted as repo_mark_posted,
-)
-from ._notification_queue_repository import (
-    mark_skipped as repo_mark_skipped,
-)
-from ._notification_queue_repository import (
-    reset_to_pending as repo_reset_to_pending,
-)
-from ._notification_queue_repository import (
-    trim_pending_keep_latest as repo_trim_pending_keep_latest,
-)
-from ._notification_rate_limit_repository import (
-    clear_rate_limit_state as repo_clear_rate_limit_state,
-)
-from ._notification_rate_limit_repository import (
-    get_rate_limit_state as repo_get_rate_limit_state,
-)
-from ._notification_rate_limit_repository import (
-    save_rate_limit_state as repo_save_rate_limit_state,
-)
 from ._notification_store_types import (
     LockingMode,
     NotificationItem,
-    NotificationStatus as NotificationStatus,
     RateLimitState,
     SupportsNotificationStoreConfig,
+)
+from ._notification_store_types import (
+    NotificationStatus as NotificationStatus,
 )
 
 if TYPE_CHECKING:
@@ -86,11 +45,6 @@ class NotificationStore(SQLiteStoreBase):
             locking_mode=locking_mode,
         )
 
-    @contextmanager
-    def _get_connection(self) -> collections.abc.Iterator[sqlite3.Connection]:
-        with self.connection() as conn:
-            yield conn
-
     def enqueue(
         self,
         event_or_payload: NotificationPayload | SupportsNotificationEvent,
@@ -99,8 +53,8 @@ class NotificationStore(SQLiteStoreBase):
     ) -> int:
         """Add a notification to the queue."""
         payload = build_notification_payload(event_or_payload, message)
-        with self._get_connection() as conn:
-            queue_id = enqueue_notification(conn, payload)
+        with self.connection() as conn:
+            queue_id = queue_repo.enqueue_notification(conn, payload)
             logger.debug("Enqueued notification: id=%d, product=%s", queue_id, payload.product_id)
 
         skipped = self.trim_pending_keep_latest(max_pending)
@@ -113,55 +67,55 @@ class NotificationStore(SQLiteStoreBase):
         return queue_id
 
     def get_pending(self, limit: int = 10) -> list[NotificationItem]:
-        with self._get_connection() as conn:
-            return get_pending_notifications(conn, limit=limit)
+        with self.connection() as conn:
+            return queue_repo.get_pending_notifications(conn, limit=limit)
 
     def get_next_pending(self) -> NotificationItem | None:
         items = self.get_pending(limit=1)
         return items[0] if items else None
 
     def mark_posted(self, item_id: int, tweet_id: str | None = None) -> None:
-        with self._get_connection() as conn:
-            repo_mark_posted(conn, item_id, tweet_id=tweet_id)
+        with self.connection() as conn:
+            queue_repo.mark_posted(conn, item_id, tweet_id=tweet_id)
             logger.info("Marked notification as posted: id=%d", item_id)
 
     def mark_failed(self, item_id: int, error_message: str) -> None:
-        with self._get_connection() as conn:
-            repo_mark_failed(conn, item_id, error_message)
+        with self.connection() as conn:
+            queue_repo.mark_failed(conn, item_id, error_message)
             logger.warning("Marked notification as failed: id=%d, error=%s", item_id, error_message)
 
     def mark_skipped(self, item_id: int, reason: str) -> None:
-        with self._get_connection() as conn:
-            repo_mark_skipped(conn, item_id, reason)
+        with self.connection() as conn:
+            queue_repo.mark_skipped(conn, item_id, reason)
             logger.info("Marked notification as skipped: id=%d, reason=%s", item_id, reason)
 
     def reset_to_pending(self, item_id: int) -> None:
-        with self._get_connection() as conn:
-            repo_reset_to_pending(conn, item_id)
+        with self.connection() as conn:
+            queue_repo.reset_to_pending(conn, item_id)
 
     def increment_retry_count(self, item_id: int, error_message: str) -> int:
-        with self._get_connection() as conn:
-            return repo_increment_retry_count(conn, item_id, error_message)
+        with self.connection() as conn:
+            return queue_repo.increment_retry_count(conn, item_id, error_message)
 
     def get_last_posted_time(self) -> datetime | None:
-        with self._get_connection() as conn:
-            return repo_get_last_posted_time(conn)
+        with self.connection() as conn:
+            return history_repo.get_last_posted_time(conn)
 
     def get_last_posted_time_for_product(self, product_id: str) -> datetime | None:
-        with self._get_connection() as conn:
-            return repo_get_last_posted_time_for_product(conn, product_id)
+        with self.connection() as conn:
+            return history_repo.get_last_posted_time_for_product(conn, product_id)
 
     def get_pending_count(self) -> int:
-        with self._get_connection() as conn:
-            return repo_get_pending_count(conn)
+        with self.connection() as conn:
+            return queue_repo.get_pending_count(conn)
 
     def trim_pending_keep_latest(self, keep_count: int = 10) -> int:
-        with self._get_connection() as conn:
-            return repo_trim_pending_keep_latest(conn, keep_count=keep_count)
+        with self.connection() as conn:
+            return queue_repo.trim_pending_keep_latest(conn, keep_count=keep_count)
 
     def cleanup_old_items(self, days: int = 30) -> int:
-        with self._get_connection() as conn:
-            deleted = repo_cleanup_old_items(conn, days=days)
+        with self.connection() as conn:
+            deleted = queue_repo.cleanup_old_items(conn, days=days)
             if deleted > 0:
                 logger.info("Deleted %d old notification items", deleted)
             return deleted
@@ -172,8 +126,8 @@ class NotificationStore(SQLiteStoreBase):
         app_reset: datetime,
         user_reset: datetime,
     ) -> None:
-        with self._get_connection() as conn:
-            repo_save_rate_limit_state(
+        with self.connection() as conn:
+            rate_limit_repo.save_rate_limit_state(
                 conn,
                 next_available_at=next_available_at,
                 app_reset=app_reset,
@@ -185,12 +139,12 @@ class NotificationStore(SQLiteStoreBase):
             )
 
     def get_rate_limit_state(self) -> RateLimitState | None:
-        with self._get_connection() as conn:
-            return repo_get_rate_limit_state(conn)
+        with self.connection() as conn:
+            return rate_limit_repo.get_rate_limit_state(conn)
 
     def clear_rate_limit_state(self) -> None:
-        with self._get_connection() as conn:
-            repo_clear_rate_limit_state(conn)
+        with self.connection() as conn:
+            rate_limit_repo.clear_rate_limit_state(conn)
             logger.debug("Cleared rate limit state")
 
 

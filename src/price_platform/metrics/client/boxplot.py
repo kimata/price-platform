@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import sqlite3
-import statistics
 from datetime import timedelta
 
-from ._client_metrics_sqlite_models import BoxplotData, DeviceType, MetricName, _date_range
-from ._sqlite_protocols import ClientMetricsBoxplotProvider
-from .platform import clock
+from ..._sqlite_protocols import ClientMetricsBoxplotProvider
+from ...platform import clock
+from .models import BoxplotData, DeviceType, MetricName, _date_range
+from .quartiles import compute_quartiles
 
 
 class ClientMetricsBoxplotMixin:
@@ -95,27 +95,20 @@ class ClientMetricsBoxplotMixin:
         if not values:
             return None
 
-        sorted_values = sorted(values)
-        n = len(sorted_values)
-        min_val = sorted_values[0]
-        max_val = sorted_values[-1]
-        median_val = statistics.median(sorted_values)
-        avg_val = statistics.mean(values)
-        q1_idx = n // 4
-        q3_idx = (3 * n) // 4
-        q1_val = sorted_values[q1_idx] if q1_idx < n else min_val
-        q3_val = sorted_values[q3_idx] if q3_idx < n else max_val
+        quartiles = compute_quartiles(values)
+        if quartiles is None:
+            return None
 
         return BoxplotData(
             date=date_str,
             device_type=device_type,
-            min_val=min_val,
-            q1=q1_val,
-            median=median_val,
-            q3=q3_val,
-            max_val=max_val,
-            avg=avg_val,
-            count=n,
+            min_val=quartiles.min_val,
+            q1=quartiles.q1,
+            median=quartiles.median,
+            q3=quartiles.q3,
+            max_val=quartiles.max_val,
+            avg=quartiles.avg,
+            count=quartiles.count,
         )
 
     def get_realtime_stats_for_dates(

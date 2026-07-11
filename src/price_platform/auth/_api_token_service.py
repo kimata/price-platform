@@ -5,16 +5,14 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
-import jwt
-
 from ..webapp.cors import get_cors_origins
-from .secrets import FileSecretStore
+from ._jwt_service import JWT_ALGORITHM, decode_token, encode_token
 
-JWT_ALGORITHM = "HS256"
+__all__ = ["JWT_ALGORITHM"]  # 公開 facade からの再エクスポート互換
 
 
 @dataclass(frozen=True)
@@ -22,7 +20,7 @@ class ApiTokenSettings:
     secret_path: Path = Path("data/api_token_secret.key")
     expiry_sec: int = 180
     allowed_origins: tuple[str, ...] = field(default_factory=tuple)
-    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET"
+    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET"  # noqa: S105 - 環境変数名であり秘密ではない
 
 
 class SupportsWebappConfig(Protocol):
@@ -35,27 +33,15 @@ def get_ssr_internal_secret(env_var: str) -> str | None:
 
 
 def generate_api_token(settings: ApiTokenSettings) -> str:
-    secret = FileSecretStore(settings.secret_path).ensure()
-    now = datetime.now(UTC)
-    exp = now + timedelta(seconds=settings.expiry_sec)
-    payload = {"type": "api", "iat": int(now.timestamp()), "exp": int(exp.timestamp())}
-    return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
+    return encode_token(
+        settings.secret_path,
+        claims={"type": "api"},
+        lifetime=timedelta(seconds=settings.expiry_sec),
+    )
 
 
 def verify_api_token(token: str, settings: ApiTokenSettings) -> dict[str, Any] | None:
-    try:
-        secret = FileSecretStore(settings.secret_path).load()
-    except FileNotFoundError:
-        return None
-    try:
-        payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != "api":
-            return None
-        return dict(payload)
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
+    return decode_token(settings.secret_path, token, expected_type="api")
 
 
 def build_api_token_settings_getter(
@@ -63,7 +49,7 @@ def build_api_token_settings_getter(
     config_getter: Callable[[], SupportsWebappConfig],
     secret_path: Path,
     expiry_sec: int = 180,
-    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET",
+    ssr_internal_secret_env: str = "SSR_INTERNAL_SECRET",  # noqa: S107 - 環境変数名であり秘密ではない
 ) -> Callable[[], ApiTokenSettings]:
     def settings_getter() -> ApiTokenSettings:
         try:

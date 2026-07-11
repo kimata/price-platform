@@ -31,6 +31,36 @@ class WebPushSubscriptionRecord:
 
 
 @dataclass(frozen=True)
+class DeliveryStats:
+    """配信結果の期間集計。"""
+
+    total: int = 0
+    sent: int = 0
+    failed: int = 0
+    expired: int = 0
+
+
+@dataclass(frozen=True)
+class DeliveryDailyStats:
+    """配信結果の日次集計 (F3: 配信成功率の推移可視化用)。"""
+
+    date: str
+    sent: int = 0
+    failed: int = 0
+    expired: int = 0
+
+    @property
+    def total(self) -> int:
+        return self.sent + self.failed + self.expired
+
+    @property
+    def success_rate(self) -> float:
+        if self.total == 0:
+            return 100.0
+        return round(self.sent / self.total * 100, 1)
+
+
+@dataclass(frozen=True)
 class DeliveryLogEntry:
     id: int
     subscription_id: int

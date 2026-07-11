@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-from .platform import clock
+from ...platform import clock
 
 LockingMode = Literal["NORMAL", "EXCLUSIVE"]
 
@@ -155,3 +155,12 @@ class StoreAggregateStats:
     avg_duration_sec: float
     success_rate: float
     durations: list[float] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class FailureTimeseriesEntry:
+    """日付 × ストア別の失敗件数。"""
+
+    date: str
+    store_name: str
+    failure_count: int

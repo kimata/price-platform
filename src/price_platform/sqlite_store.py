@@ -105,8 +105,11 @@ class SQLiteBootstrapper:
         )
         with platform_sqlite.connect(self._db_path, locking_mode=self._locking_mode) as conn:
             conn.row_factory = sqlite3.Row
-            self._record_schema_metadata(conn)
+            # マイグレーション適用後にメタデータを記録する。
+            # 逆順だと DDL が未反映のまま新スキーマの SHA-256 が記録され、
+            # 整合性メタデータが実態と乖離する (B7)。
             self._migration_runner.apply(conn)
+            self._record_schema_metadata(conn)
 
     @property
     def schema_metadata(self) -> SchemaMetadata:

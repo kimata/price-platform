@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 ConfigT = TypeVar("ConfigT")
 PriceStoreT = TypeVar("PriceStoreT")
@@ -12,7 +12,7 @@ PriceEventStoreT = TypeVar("PriceEventStoreT")
 
 
 @dataclass(frozen=True)
-class StoreRuntime(Generic[PriceStoreT, PriceEventStoreT]):
+class StoreRuntime[PriceStoreT, PriceEventStoreT]:
     """クローラと Web API で共有するストア依存の束。"""
 
     price_store: PriceStoreT
@@ -32,7 +32,7 @@ def build_store_runtime(
     )
 
 
-def build_store_runtime_for(
+def build_store_runtime_for[ConfigT, PriceStoreT, PriceEventStoreT](
     config: ConfigT,
     *,
     price_store_type: type[PriceStoreT],

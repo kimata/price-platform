@@ -1,0 +1,16 @@
+-- Shared price quarantine schema owned by price-platform (F4)
+CREATE TABLE IF NOT EXISTS price_quarantine (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_name    TEXT NOT NULL,
+    store_name      TEXT NOT NULL,
+    price           INTEGER NOT NULL,
+    reference_price INTEGER,
+    reason          TEXT NOT NULL,
+    title           TEXT,
+    url             TEXT,
+    recorded_at     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_quarantine_recorded_at ON price_quarantine(recorded_at);
+CREATE INDEX IF NOT EXISTS idx_quarantine_store ON price_quarantine(store_name);
+CREATE INDEX IF NOT EXISTS idx_quarantine_reason ON price_quarantine(reason);

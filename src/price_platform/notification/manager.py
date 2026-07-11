@@ -6,12 +6,13 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from price_platform.config import TwitterConfig
 from price_platform.social_posts import SocialCopyMetadata, SocialPostContext, compose_social_post
 from price_platform.store._price_event_message import format_event_message_from_event
 
+from .webpush_dispatcher import WebPushDispatcher
 from .webpush_sender import WebPushResult, build_detail_url
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,21 @@ class _NotifiableEventLike(Protocol):
 
     @property
     def store(self) -> Any: ...
+
+    @property
+    def previous_price(self) -> int | None: ...
+
+    @property
+    def reference_price(self) -> int | None: ...
+
+    @property
+    def change_percent(self) -> float | None: ...
+
+    @property
+    def period_days(self) -> int | None: ...
+
+    @property
+    def recorded_at(self) -> Any: ...
 
     def format_message(self, product_name: str) -> str: ...
 
@@ -88,28 +104,28 @@ class WebPushSenderProtocol(Protocol[_EventT_contra, _ProductT_contra]):
 
 
 @dataclass(frozen=True)
-class SelectionKeyStrategy(Generic[EventT, ProductT]):
+class SelectionKeyStrategy[EventT: _NotifiableEventLike, ProductT]:
     """通知リンクの selection key を解決する戦略。"""
 
     resolve: Callable[[EventT, ProductT | None], str | None]
 
 
 @dataclass(frozen=True)
-class ProductLineStrategy(Generic[EventT, ProductT]):
+class ProductLineStrategy[EventT: _NotifiableEventLike, ProductT]:
     """通知文面用の商品名行を組み立てる戦略。"""
 
     build: Callable[[ProductT, EventT], str]
 
 
 @dataclass(frozen=True)
-class SocialCopyStrategy(Generic[ProductT]):
+class SocialCopyStrategy[ProductT]:
     """SNS 投稿向け補足文言を組み立てる戦略。"""
 
     build: Callable[[ProductT], SocialCopyMetadata]
 
 
 @dataclass(frozen=True)
-class NotificationStrategies(Generic[EventT, ProductT]):
+class NotificationStrategies[EventT: _NotifiableEventLike, ProductT]:
     """通知文面生成に使う差し替え戦略群。"""
 
     selection_key: SelectionKeyStrategy[EventT, ProductT]
@@ -118,7 +134,7 @@ class NotificationStrategies(Generic[EventT, ProductT]):
 
 
 @dataclass(frozen=True)
-class NotificationPresentation(Generic[EventT, ProductT, CatalogT]):
+class NotificationPresentation[EventT: _NotifiableEventLike, ProductT, CatalogT]:
     """通知文面生成に必要なアプリ差分をまとめた定義。"""
 
     resolve_product: Callable[[CatalogT, str], ProductT | None]
@@ -127,7 +143,12 @@ class NotificationPresentation(Generic[EventT, ProductT, CatalogT]):
 
 
 @dataclass(frozen=True)
-class NotificationRuntime(Generic[NotificationStoreT, TwitterPosterT, WebPushStoreT, WebPushSenderT]):
+class NotificationRuntime[
+    NotificationStoreT: "NotificationStoreProtocol[Any]",
+    TwitterPosterT: "TwitterPosterProtocol",
+    WebPushStoreT,
+    WebPushSenderT: "WebPushSenderProtocol[Any, Any]",
+]:
     """通知ランタイムの生成関数群。"""
 
     open_notification_store: Callable[[Path], NotificationStoreT]
@@ -187,11 +208,12 @@ def build_social_message(
             event_emoji=event.event_type.emoji,
             store_label=event.store.label,
             price=event.price,
-            previous_price=getattr(event, "previous_price"),  # noqa: B009
-            reference_price=getattr(event, "reference_price"),  # noqa: B009
-            change_percent=getattr(event, "change_percent"),  # noqa: B009
-            period_days=getattr(event, "period_days"),  # noqa: B009
-            recorded_at=getattr(event, "recorded_at"),  # noqa: B009
+            previous_price=event.previous_price,
+            reference_price=event.reference_price,
+            change_percent=event.change_percent,
+            period_days=event.period_days,
+            recorded_at=event.recorded_at,
+            # ProductT はアプリ固有型のため属性宣言を強制できない (hashtag のみ動的参照)
             hashtag=getattr(product, "hashtag"),  # noqa: B009
             social_copy=strategies.social_copy.build(product),
         )
@@ -200,18 +222,16 @@ def build_social_message(
 
 
 @dataclass
-class BaseNotificationManager(
-    Generic[
-        ConfigT,
-        EventT,
-        ProductT,
-        CatalogT,
-        NotificationStoreT,
-        TwitterPosterT,
-        WebPushStoreT,
-        WebPushSenderT,
-    ]
-):
+class BaseNotificationManager[
+    ConfigT: _NotificationConfigLike,
+    EventT: _NotifiableEventLike,
+    ProductT,
+    CatalogT,
+    NotificationStoreT: "NotificationStoreProtocol[Any]",
+    TwitterPosterT: "TwitterPosterProtocol",
+    WebPushStoreT,
+    WebPushSenderT: "WebPushSenderProtocol[Any, Any]",
+]:
     """通知ストア、投稿ワーカー、Web Push の共通ライフサイクル管理。"""
 
     config: ConfigT
@@ -222,6 +242,7 @@ class BaseNotificationManager(
     _catalog_getter: Callable[[], CatalogT] | None = field(default=None, repr=False)
     _webpush_store: WebPushStoreT | None = field(default=None, repr=False)
     _webpush_sender: WebPushSenderT | None = field(default=None, repr=False)
+    _webpush_dispatcher: WebPushDispatcher[Any, Any] | None = field(default=None, repr=False)
 
     def start(self, catalog_getter: Callable[[], CatalogT]) -> None:
         """通知機能を起動する。"""
@@ -251,7 +272,10 @@ class BaseNotificationManager(
                 self._webpush_store,
                 self.config.webapp.external_url,
             )
-            logger.info("Web Push sender を初期化")
+            # 送信はワーカースレッドで非同期に行い、クローラをブロックしない (F2)
+            self._webpush_dispatcher = WebPushDispatcher(self._webpush_sender)
+            self._webpush_dispatcher.start()
+            logger.info("Web Push sender を初期化 (非同期ディスパッチャ起動)")
 
     def stop(self) -> None:
         """通知機能を停止する。"""
@@ -259,6 +283,10 @@ class BaseNotificationManager(
             self._poster.stop()
             self._poster = None
             logger.info("Twitter投稿ワーカーを停止")
+
+        if self._webpush_dispatcher is not None:
+            self._webpush_dispatcher.stop()
+            self._webpush_dispatcher = None
 
         if self._webpush_sender is not None:
             self._webpush_sender = None
@@ -269,56 +297,53 @@ class BaseNotificationManager(
         self._catalog_getter = None
 
     def enqueue(self, event: EventT) -> None:
-        """価格イベントを通知キューに登録する。"""
+        """価格イベントを通知チャネルに登録する。
+
+        twitter_enabled は Twitter 投稿のみのゲートであり、
+        Web Push は購読者側の event_type_filter で受信種別を選ぶため、
+        イベント側のフラグでは遮断しない (B10)。
+        """
         if self._store is None:
             return
 
-        if not event.twitter_enabled:
-            logger.debug("通知スキップ（対象外）: %s - %s", event.event_type.label, event.product_id)
-            return
-
         product = self._resolve_product(event)
-        display_name = (
-            self.presentation.product_name_getter(product)
-            if product is not None
-            else event.product_id
-        )
-        formatter = getattr(event, "format_message", None)
-        body = formatter(display_name) if callable(formatter) else format_event_message_from_event(event, display_name)
-        message = f"{event.event_type.emoji} {body}"
 
-        if product is not None and self.config.webapp.external_url:
-            message = build_social_message(
-                event,
-                product,
-                self.config.webapp.external_url,
-                self.presentation.strategies,
+        if event.twitter_enabled:
+            display_name = (
+                self.presentation.product_name_getter(product) if product is not None else event.product_id
             )
+            formatter = getattr(event, "format_message", None)
+            body = (
+                formatter(display_name)
+                if callable(formatter)
+                else format_event_message_from_event(event, display_name)
+            )
+            message = f"{event.event_type.emoji} {body}"
 
-        self._store.enqueue(event, message)
-        logger.info("通知キューに追加: %s - %s", event.event_type.label, event.product_id)
+            if product is not None and self.config.webapp.external_url:
+                message = build_social_message(
+                    event,
+                    product,
+                    self.config.webapp.external_url,
+                    self.presentation.strategies,
+                )
 
-        if self._poster is not None:
-            self._poster.notify_new_item()
+            self._store.enqueue(event, message)
+            logger.info("通知キューに追加: %s - %s", event.event_type.label, event.product_id)
 
-        if self._webpush_sender is not None and product is not None:
-            result = self._webpush_sender.send_to_all(event, product)
-            self._log_webpush_result(result)
+            if self._poster is not None:
+                self._poster.notify_new_item()
+        else:
+            logger.debug("Twitter 投稿スキップ（対象外）: %s - %s", event.event_type.label, event.product_id)
+
+        if self._webpush_dispatcher is not None and product is not None:
+            self._webpush_dispatcher.submit(event, product)
 
     def _resolve_product(self, event: EventT) -> ProductT | None:
         if self._catalog_getter is None:
             return None
         catalog = self._catalog_getter()
         return self.presentation.resolve_product(catalog, event.product_id)
-
-    def _log_webpush_result(self, result: WebPushResult) -> None:
-        if result.success_count > 0 or result.failed_count > 0 or result.expired_count > 0:
-            logger.info(
-                "Web Push 送信: 成功=%d, 失敗=%d, 期限切れ=%d",
-                result.success_count,
-                result.failed_count,
-                result.expired_count,
-            )
 
     @property
     def is_running(self) -> bool:

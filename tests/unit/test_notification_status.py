@@ -7,6 +7,7 @@ from price_platform.notification.status import (
     build_twitter_status_payload,
     build_webpush_status_payload,
 )
+from price_platform.notification.webpush_store import DeliveryDailyStats, DeliveryStats
 
 
 @dataclass(frozen=True)
@@ -36,9 +37,12 @@ class _WebPushStore:
     def get_subscription_count(self) -> int:
         return 4
 
-    def get_delivery_stats(self, days: int = 30) -> dict[str, int]:
+    def get_delivery_stats(self, days: int = 30) -> DeliveryStats:
         assert days == 7
-        return {"total": 10, "sent": 7, "failed": 2, "expired": 1}
+        return DeliveryStats(total=10, sent=7, failed=2, expired=1)
+
+    def get_delivery_timeseries(self, days: int = 30) -> list[DeliveryDailyStats]:
+        return [DeliveryDailyStats(date="2026-03-31", sent=7, failed=2, expired=1)]
 
     def get_group_subscription_stats(self) -> dict[str, int]:
         return {"sony": 2, "canon": 1}

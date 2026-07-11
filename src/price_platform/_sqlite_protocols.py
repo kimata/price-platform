@@ -6,14 +6,14 @@ import sqlite3
 from contextlib import AbstractContextManager
 from typing import Protocol
 
-from ._client_metrics_sqlite_models import (
+from .metrics.client.models import (
     BoxplotData,
     DeviceType,
     MetricName,
     WebVitalBoxplotData,
     WebVitalName,
 )
-from ._metrics_sqlite_models import AmazonBatchStats, CrawlSession, CycleStats, ItemCrawlStats
+from .metrics.server.models import AmazonBatchStats, CrawlSession, CycleStats, ItemCrawlStats
 
 
 class SQLiteConnectionProvider(Protocol):

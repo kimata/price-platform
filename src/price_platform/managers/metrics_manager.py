@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from price_platform.platform import clock
 
@@ -111,6 +111,29 @@ class StoreMetricsAccumulator:
     total_duration_sec: float = 0.0
 
 
+@dataclass(frozen=True)
+class StoreSessionSummary:
+    """ストア別のセッション集計。"""
+
+    total: int
+    success: int
+    failed: int
+    avg_duration: float
+
+
+@dataclass(frozen=True)
+class SessionSummary:
+    """クロールセッションのサマリー。"""
+
+    session_id: int | None
+    total_items: int
+    success_items: int
+    failed_items: int
+    total_products: int
+    success_products: int
+    stores: dict[str, StoreSessionSummary]
+
+
 @dataclass
 class ItemTimingContext:
     """Context for timing a single item crawl."""
@@ -146,6 +169,16 @@ class ItemTimingContext:
             success=False,
             error_message=error_message,
         )
+
+    def __enter__(self) -> ItemTimingContext:
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: object) -> None:
+        """with ブロックとして使うと、例外時は failure を自動記録し正常時は success を記録する。"""
+        if exc is not None:
+            self.failure(str(exc))
+        else:
+            self.success()
 
 
 class MetricsManager:
@@ -401,22 +434,22 @@ class MetricsManager:
         """
         return self._db.cleanup_old_records(days=days)
 
-    def get_session_summary(self) -> dict[str, Any]:
+    def get_session_summary(self) -> SessionSummary:
         """Get current session summary for logging."""
-        return {
-            "session_id": self._current_session_id,
-            "total_items": self._total_items,
-            "success_items": self._success_items,
-            "failed_items": self._failed_items,
-            "total_products": len(self._processed_product_ids),
-            "success_products": len(self._success_product_ids),
-            "stores": {
-                name: {
-                    "total": acc.total_items,
-                    "success": acc.success_count,
-                    "failed": acc.failed_count,
-                    "avg_duration": acc.total_duration_sec / acc.success_count if acc.success_count else 0,
-                }
+        return SessionSummary(
+            session_id=self._current_session_id,
+            total_items=self._total_items,
+            success_items=self._success_items,
+            failed_items=self._failed_items,
+            total_products=len(self._processed_product_ids),
+            success_products=len(self._success_product_ids),
+            stores={
+                name: StoreSessionSummary(
+                    total=acc.total_items,
+                    success=acc.success_count,
+                    failed=acc.failed_count,
+                    avg_duration=acc.total_duration_sec / acc.success_count if acc.success_count else 0,
+                )
                 for name, acc in self._store_accumulators.items()
             },
-        }
+        )

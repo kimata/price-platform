@@ -167,7 +167,7 @@ def trim_pending_keep_latest(conn: sqlite3.Connection, keep_count: int = 10) -> 
         UPDATE notification_queue
         SET status = ?, error_message = ?
         WHERE status = ? AND id NOT IN ({placeholders})
-        """,  # noqa: S608
+        """,  # noqa: S608 - プレースホルダ (?) の繰り返し生成のみ
         (
             NotificationStatus.SKIPPED.value,
             "レート制限によりスキップ",

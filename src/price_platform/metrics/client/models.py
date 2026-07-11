@@ -244,7 +244,9 @@ class SocialReferralEventRaw:
     user_agent: str | None
 
     @classmethod
-    def parse(cls, data: dict, device_type: DeviceType, user_agent: str | None) -> SocialReferralEventRaw | None:
+    def parse(
+        cls, data: dict, device_type: DeviceType, user_agent: str | None
+    ) -> SocialReferralEventRaw | None:
         event_name = data.get("event_name")
         if event_name not in ("landing", "engaged_30s", "second_page"):
             return None

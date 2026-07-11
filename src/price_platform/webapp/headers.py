@@ -20,7 +20,7 @@ def _resolve_cache_control(
     path: str,
     api_prefix: str,
     cache_rules: list[CacheRule] | tuple[CacheRule, ...],
-    token_path_prefix: str = "token",
+    token_path_prefix: str = "token",  # noqa: S107 - URL パス接頭辞であり秘密ではない
     default_max_age: int = 600,
 ) -> str | None:
     if not path.startswith(api_prefix):

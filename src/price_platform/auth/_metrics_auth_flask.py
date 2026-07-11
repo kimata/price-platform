@@ -9,6 +9,7 @@ from typing import Any
 
 import flask
 
+from ._jwt_service import extract_bearer_token
 from ._metrics_auth_service import (
     MetricsAuthSettings,
     SupportsMetricsConfig,
@@ -31,7 +32,9 @@ def _get_client_ip() -> str:
     return flask.request.remote_addr or "unknown"
 
 
-def require_auth(settings_getter: Callable[[], MetricsAuthSettings]) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def require_auth(
+    settings_getter: Callable[[], MetricsAuthSettings],
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
@@ -39,11 +42,11 @@ def require_auth(settings_getter: Callable[[], MetricsAuthSettings]) -> Callable
             if not settings.enabled:
                 return func(*args, **kwargs)
 
-            auth_header = flask.request.headers.get("Authorization")
-            if not auth_header or not auth_header.startswith("Bearer "):
+            token = extract_bearer_token(flask.request.headers.get("Authorization"))
+            if token is None:
                 return flask.jsonify({"error": "Authentication required", "code": "AUTH_REQUIRED"}), 401
 
-            payload = verify_auth_token(auth_header[7:], settings)
+            payload = verify_auth_token(token, settings)
             if payload is None:
                 return flask.jsonify({"error": "Invalid or expired token", "code": "TOKEN_INVALID"}), 401
 
@@ -111,11 +114,11 @@ def create_metrics_auth_blueprint(
         if not settings.enabled:
             return flask.jsonify({"authenticated": True, "auth_enabled": False}), 200
 
-        auth_header = flask.request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
+        token = extract_bearer_token(flask.request.headers.get("Authorization"))
+        if token is None:
             return flask.jsonify({"authenticated": False, "auth_enabled": True}), 200
 
-        payload = verify_auth_token(auth_header[7:], settings)
+        payload = verify_auth_token(token, settings)
         if payload is None:
             return flask.jsonify(
                 {"authenticated": False, "auth_enabled": True, "error": "Invalid or expired token"}

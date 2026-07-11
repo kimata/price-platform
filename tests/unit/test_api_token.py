@@ -63,7 +63,7 @@ def test_build_api_token_facade_binds_config_getter(tmp_path: Path) -> None:
 def test_build_metrics_auth_facade_binds_config_getter(tmp_path: Path) -> None:
     class AuthConfigStub:
         enabled = True
-        password_hash = "hash"
+        password_hash = "hash"  # noqa: S105 - テスト用スタブ値
         jwt_secret_path = tmp_path / "jwt_secret.key"
         jwt_expiry_hours = 12
 

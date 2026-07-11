@@ -27,6 +27,11 @@ class _RateLimitState:
 class InMemoryRateLimiter:
     """Simple in-memory rate limiter for authentication endpoints."""
 
+    # record_failure がこの回数呼ばれるたびに期限切れエントリを掃除する。
+    # スイープが無いと一見客 IP の failures と期限切れ lockouts が永久に残り、
+    # メモリが単調増加する (B14)。X-Forwarded-For 偽装による DoS ベクタにもなる。
+    _SWEEP_INTERVAL = 128
+
     def __init__(
         self,
         settings: RateLimitSettings | None = None,
@@ -36,6 +41,26 @@ class InMemoryRateLimiter:
         self.settings = settings or RateLimitSettings()
         self._now_fn = now_fn or time.time
         self._state = _RateLimitState()
+        self._ops_since_sweep = 0
+
+    def _sweep_expired_locked(self, now: float) -> None:
+        """期限切れエントリを掃除する (呼び出し側で lock 保持済みであること)。"""
+        failure_cutoff = now - self.settings.failure_window_sec
+        for ip in list(self._state.failures):
+            recent = [timestamp for timestamp in self._state.failures[ip] if timestamp > failure_cutoff]
+            if recent:
+                self._state.failures[ip] = recent
+            else:
+                del self._state.failures[ip]
+        for ip in list(self._state.lockouts):
+            if now >= self._state.lockouts[ip]:
+                del self._state.lockouts[ip]
+
+    def _maybe_sweep_locked(self, now: float) -> None:
+        self._ops_since_sweep += 1
+        if self._ops_since_sweep >= self._SWEEP_INTERVAL:
+            self._ops_since_sweep = 0
+            self._sweep_expired_locked(now)
 
     def is_locked_out(self, ip: str) -> bool:
         with self._state.lock:
@@ -53,6 +78,7 @@ class InMemoryRateLimiter:
     def record_failure(self, ip: str) -> bool:
         now = self._now_fn()
         with self._state.lock:
+            self._maybe_sweep_locked(now)
             if ip in self._state.lockouts and now < self._state.lockouts[ip]:
                 return False
 

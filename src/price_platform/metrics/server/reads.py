@@ -7,18 +7,19 @@ import sqlite3
 from datetime import datetime, timedelta
 from typing import Any
 
-from ._metrics_sqlite_models import (
+from ..._sqlite_protocols import MetricsRowMapper
+from ...platform import clock
+from .models import (
     AmazonBatchStats,
     CrawlSession,
     CycleStats,
+    FailureTimeseriesEntry,
     HeatmapEntry,
     ItemCrawlStats,
     SessionStatus,
     StoreAggregateStats,
     StoreCrawlStats,
 )
-from ._sqlite_protocols import MetricsRowMapper
-from .platform import clock
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,9 @@ class MetricsDBReadMixin:
                     COUNT(*) as total_items,
                     SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
                     SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_count,
-                    COALESCE(SUM(duration_sec), 0) as total_duration_sec
+                    COALESCE(SUM(duration_sec), 0) as total_duration_sec,
+                    COALESCE(SUM(CASE WHEN success = 1 THEN duration_sec ELSE 0 END), 0)
+                        as success_duration_sec
                 FROM item_crawl_stats
                 WHERE started_at >= ?
                 GROUP BY store_name
@@ -102,6 +105,7 @@ class MetricsDBReadMixin:
                 success_count = row["success_count"] or 0
                 failed_count = row["failed_count"] or 0
                 total_duration_sec = row["total_duration_sec"] or 0.0
+                success_duration_sec = row["success_duration_sec"] or 0.0
                 results.append(
                     StoreAggregateStats(
                         store_name=row["store_name"],
@@ -110,7 +114,12 @@ class MetricsDBReadMixin:
                         success_count=success_count,
                         failed_count=failed_count,
                         total_duration_sec=total_duration_sec,
-                        avg_duration_sec=total_duration_sec / success_count if success_count > 0 else 0.0,
+                        # 平均所要時間は成功したアイテムのみで計算する。
+                        # タイムアウト失敗の duration を混ぜると体系的に過大になり、
+                        # get_store_durations (成功のみ) と定義が食い違う (B8)。
+                        avg_duration_sec=(
+                            success_duration_sec / success_count if success_count > 0 else 0.0
+                        ),
                         success_rate=success_count / total_items if total_items > 0 else 0.0,
                     )
                 )
@@ -128,7 +137,9 @@ class MetricsDBReadMixin:
             )
             return [self._row_to_item_stats(row) for row in cursor.fetchall()]
 
-    def get_store_durations(self: MetricsRowMapper, store_name: str, days: int = 30, limit: int = 1000) -> list[float]:
+    def get_store_durations(
+        self: MetricsRowMapper, store_name: str, days: int = 30, limit: int = 1000
+    ) -> list[float]:
         since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -193,7 +204,7 @@ class MetricsDBReadMixin:
                 for row in cursor.fetchall()
             ]
 
-    def get_failure_timeseries(self: MetricsRowMapper, days: int = 30) -> list[dict]:
+    def get_failure_timeseries(self: MetricsRowMapper, days: int = 30) -> list[FailureTimeseriesEntry]:
         since = clock.now() - timedelta(days=days)
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -210,7 +221,14 @@ class MetricsDBReadMixin:
                 """,
                 (since.isoformat(),),
             )
-            return [dict(row) for row in cursor.fetchall()]
+            return [
+                FailureTimeseriesEntry(
+                    date=row["date"],
+                    store_name=row["store_name"],
+                    failure_count=row["failure_count"],
+                )
+                for row in cursor.fetchall()
+            ]
 
     def get_unique_product_count_for_session(self: MetricsRowMapper, session_id: int) -> int:
         with self._get_connection() as conn:
@@ -227,7 +245,9 @@ class MetricsDBReadMixin:
 
     def get_total_item_count_for_session(self: MetricsRowMapper, session_id: int) -> int:
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT COUNT(*) as cnt FROM item_crawl_stats WHERE session_id = ?", (session_id,))
+            cursor = conn.execute(
+                "SELECT COUNT(*) as cnt FROM item_crawl_stats WHERE session_id = ?", (session_id,)
+            )
             item_count = cursor.fetchone()["cnt"]
             cursor = conn.execute(
                 "SELECT COALESCE(SUM(product_count), 0) as cnt FROM amazon_batch_stats WHERE session_id = ?",
@@ -236,7 +256,9 @@ class MetricsDBReadMixin:
             amazon_count = cursor.fetchone()["cnt"]
             return item_count + amazon_count
 
-    def calculate_cycle_stats(self: MetricsRowMapper, session: CrawlSession, total_product_count: int) -> CycleStats:
+    def calculate_cycle_stats(
+        self: MetricsRowMapper, session: CrawlSession, total_product_count: int
+    ) -> CycleStats:
         unique_product_count = self.get_unique_product_count_for_session(session.id)
         total_item_count = self.get_total_item_count_for_session(session.id)
         completed_cycles = session.round_count
@@ -244,8 +266,12 @@ class MetricsDBReadMixin:
         if completed_cycles == 0:
             current_cycle_products = unique_product_count - session.round_start_product_count
         elif current_cycle_stores > 0 and unique_product_count > 0:
-            avg_stores_per_product = total_item_count / unique_product_count if unique_product_count > 0 else 1
-            current_cycle_products = min(total_product_count, int(current_cycle_stores / avg_stores_per_product))
+            avg_stores_per_product = (
+                total_item_count / unique_product_count if unique_product_count > 0 else 1
+            )
+            current_cycle_products = min(
+                total_product_count, int(current_cycle_stores / avg_stores_per_product)
+            )
         else:
             current_cycle_products = 0
 
@@ -310,7 +336,9 @@ class MetricsDBReadMixin:
             id=row_dict["id"],
             started_at=datetime.fromisoformat(row_dict["started_at"]),
             last_heartbeat_at=(
-                datetime.fromisoformat(row_dict["last_heartbeat_at"]) if row_dict["last_heartbeat_at"] else None
+                datetime.fromisoformat(row_dict["last_heartbeat_at"])
+                if row_dict["last_heartbeat_at"]
+                else None
             ),
             ended_at=(datetime.fromisoformat(row_dict["ended_at"]) if row_dict["ended_at"] else None),
             work_ended_at=(

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import functools
+import xml.sax.saxutils
 
-from ._client_metrics_sqlite_models import BoxplotData
+from ..client.models import BoxplotData
 
 
-@functools.cache
+# キーには当日のリアルタイム集計が含まれリクエスト毎に変化するため、
+# 無制限の functools.cache だとメモリが単調増加する (B6)。上限付き LRU にする。
+@functools.lru_cache(maxsize=32)
 def generate_boxplot_svg(
     data: tuple[BoxplotData, ...],
     title: str,
@@ -16,6 +19,9 @@ def generate_boxplot_svg(
 ) -> str:
     if not data:
         return _generate_empty_svg(title, width, height)
+
+    # リクエスト由来文字列が渡っても SVG へのマークアップ注入にならないようにする (B9)
+    title = xml.sax.saxutils.escape(title)
 
     dates = sorted({d.date for d in data})
     if len(dates) > 30:
@@ -31,6 +37,8 @@ def generate_boxplot_svg(
     all_values = [d.max_val for d in data] + [d.min_val for d in data]
     y_min = 0
     y_max = min(max(all_values) * 1.1, 2000) if all_values else 1000
+    # 全値 0 の日 (ttfb 0ms は有効値) でも y_scale がゼロ除算しないようにする (B21)
+    y_max = max(y_max, 1)
 
     def y_scale(val: float) -> float:
         return margin_top + chart_height - (val - y_min) / (y_max - y_min) * chart_height
@@ -74,7 +82,8 @@ def generate_boxplot_svg(
             f'<text x="{margin_left - 5}" y="{y_pos + 4}" class="label" text-anchor="end">{int(y_val)}</text>'
         )
         svg_parts.append(
-            f'<line x1="{margin_left}" y1="{y_pos}" x2="{x_axis_x2}" y2="{y_pos}" stroke="#e5e7eb" stroke-width="1" />'
+            f'<line x1="{margin_left}" y1="{y_pos}" x2="{x_axis_x2}" y2="{y_pos}"'
+            ' stroke="#e5e7eb" stroke-width="1" />'
         )
         y_val += step
 
@@ -84,7 +93,9 @@ def generate_boxplot_svg(
         day = int(date_str.split("-")[2])
         label = f"{int(date_str.split('-')[1])}/{day}" if day == 1 or i == 0 else str(day)
         label_y = y_axis_y2 + 15
-        svg_parts.append(f'<text x="{x_center}" y="{label_y}" class="label" text-anchor="middle">{label}</text>')
+        svg_parts.append(
+            f'<text x="{x_center}" y="{label_y}" class="label" text-anchor="middle">{label}</text>'
+        )
 
         for d in date_data:
             x_offset = -box_width * 0.6 if d.device_type == "mobile" else box_width * 0.6
@@ -98,16 +109,22 @@ def generate_boxplot_svg(
             box_x = x - box_width / 2
 
             svg_parts.append(f'<line x1="{x}" y1="{y_min_pt}" x2="{x}" y2="{y_max_pt}" class="whisker" />')
-            svg_parts.append(f'<line x1="{cap_x1}" y1="{y_min_pt}" x2="{cap_x2}" y2="{y_min_pt}" class="whisker" />')
-            svg_parts.append(f'<line x1="{cap_x1}" y1="{y_max_pt}" x2="{cap_x2}" y2="{y_max_pt}" class="whisker" />')
+            svg_parts.append(
+                f'<line x1="{cap_x1}" y1="{y_min_pt}" x2="{cap_x2}" y2="{y_min_pt}" class="whisker" />'
+            )
+            svg_parts.append(
+                f'<line x1="{cap_x1}" y1="{y_max_pt}" x2="{cap_x2}" y2="{y_max_pt}" class="whisker" />'
+            )
             box_top = y_scale(d.q3)
             box_bottom = y_scale(d.q1)
             box_height = box_bottom - box_top
             svg_parts.append(
-                f'<rect x="{box_x}" y="{box_top}" width="{box_width}" height="{box_height}" class="{box_class}" />'
+                f'<rect x="{box_x}" y="{box_top}" width="{box_width}" height="{box_height}"'
+                f' class="{box_class}" />'
             )
             svg_parts.append(
-                f'<line x1="{box_x}" y1="{y_median}" x2="{x + box_width / 2}" y2="{y_median}" class="median" />'
+                f'<line x1="{box_x}" y1="{y_median}" x2="{x + box_width / 2}" y2="{y_median}"'
+                ' class="median" />'
             )
 
     svg_parts.append("</svg>")
@@ -115,6 +132,7 @@ def generate_boxplot_svg(
 
 
 def _generate_empty_svg(title: str, width: int, height: int) -> str:
+    title = xml.sax.saxutils.escape(title)
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">
     <style>
         .title {{ font-family: sans-serif; font-size: 14px; fill: #111827; font-weight: bold; }}

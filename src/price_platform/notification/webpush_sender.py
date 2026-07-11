@@ -2,16 +2,43 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
+import sqlite3
 import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, ClassVar, Generic, Protocol, TypeVar
+from enum import Enum
+from typing import Any, ClassVar, Protocol, TypeVar
 
 from ..config import WebPushConfig
 
 logger = logging.getLogger(__name__)
+
+# pywebpush (requests) の送信タイムアウト秒。未指定だと無限待ちになり、
+# 呼び出し元 (クローラ) を購読者数 × レイテンシ分ブロックする (B11)。
+DEFAULT_SEND_TIMEOUT_SEC = 10
+
+# この回数連続で送信に失敗した購読は自動的に無効化する (B12)。
+MAX_CONSECUTIVE_FAILURES = 7
+
+
+class PushSendStatus(Enum):
+    """1 件の Web Push 送信結果の種別。"""
+
+    SUCCESS = "success"
+    EXPIRED = "expired"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class PushSendResult:
+    """1 件の Web Push 送信結果。"""
+
+    status: PushSendStatus
+    error_message: str | None = None
+    status_code: int | None = None
 
 class _PriceEventLike(Protocol):
     """WebPush 送信に必要な最小イベント属性。"""
@@ -51,6 +78,12 @@ class WebPushStoreProtocol(Protocol[SubscriptionT]):
 
     def mark_expired(self, endpoint: str) -> None: ...
 
+    def record_delivery_failure(self, endpoint: str) -> int: ...
+
+    def record_delivery_success(self, endpoint: str) -> None: ...
+
+    def delete_inactive_subscriptions(self) -> int: ...
+
     def log_delivery(
         self,
         subscription_id: int,
@@ -78,6 +111,32 @@ def build_detail_url(base_url: str, product_id: str, selection_key: str | None =
     return detail_url
 
 
+@dataclass(frozen=True)
+class WebPushPayloadData:
+    """通知 payload の data 部。"""
+
+    url: str | None
+    product_id: str
+    selection_key: str | None
+    event_type: str
+    price: int
+    store: str
+
+
+@dataclass(frozen=True)
+class WebPushPayload:
+    """Web Push 通知の payload。"""
+
+    title: str
+    body: str
+    icon: str | None
+    tag: str
+    data: WebPushPayloadData
+
+    def to_json(self) -> str:
+        return json.dumps(dataclasses.asdict(self))
+
+
 @dataclass
 class WebPushResult:
     """Result of a Web Push send operation."""
@@ -87,7 +146,7 @@ class WebPushResult:
     expired_count: int
 
 
-class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
+class BaseWebPushSender[EventT: _PriceEventLike, ProductT, StoreT: "WebPushStoreProtocol"]:
     """Shared Web Push sender with app-specific callbacks."""
 
     def __init__(
@@ -116,7 +175,7 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
         if self._vapid_private_key is not None:
             logger.info("VAPID private key configured")
 
-    def build_payload(self, event: EventT, product: ProductT) -> dict[str, object | None]:
+    def build_payload(self, event: EventT, product: ProductT) -> WebPushPayload:
         """Build notification payload for a price event."""
         product_id = self._product_id_getter(product)
         selection_key = self._selection_key_getter(event, product)
@@ -132,20 +191,20 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
         if icon_url is None:
             icon_url = self._fallback_icon_url_getter(product)
 
-        return {
-            "title": f"{event.event_type.emoji} {event.event_type.label}",
-            "body": f"{self._product_label_getter(product)}\n¥{event.price:,} ({event.store.label})",
-            "icon": icon_url,
-            "tag": f"price-{product_id[:50]}",
-            "data": {
-                "url": url,
-                "product_id": product_id,
-                "selection_key": selection_key,
-                "event_type": event.event_type.value,
-                "price": event.price,
-                "store": event.store.value,
-            },
-        }
+        return WebPushPayload(
+            title=f"{event.event_type.emoji} {event.event_type.label}",
+            body=f"{self._product_label_getter(product)}\n¥{event.price:,} ({event.store.label})",
+            icon=icon_url,
+            tag=f"price-{product_id[:50]}",
+            data=WebPushPayloadData(
+                url=url,
+                product_id=product_id,
+                selection_key=selection_key,
+                event_type=event.event_type.value,
+                price=event.price,
+                store=event.store.value,
+            ),
+        )
 
     def send_to_all(self, event: EventT, product: ProductT) -> WebPushResult:
         """Send a notification to every matching subscription."""
@@ -162,7 +221,7 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
             logger.debug("No matching subscriptions for event: %s", event.event_type.value)
             return WebPushResult(success_count=0, failed_count=0, expired_count=0)
 
-        payload_json = json.dumps(self.build_payload(event, product))
+        payload_json = self.build_payload(event, product).to_json()
         success_count = 0
         failed_count = 0
         expired_count = 0
@@ -177,14 +236,15 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
                 )
                 event_id = getattr(event, "id", None)
 
-                if result == "success":
+                if result.status is PushSendStatus.SUCCESS:
                     success_count += 1
                     self._store.update_last_used(subscription.id)
+                    self._store.record_delivery_success(subscription.endpoint)
                     if event_id:
                         self._store.log_delivery(
                             subscription.id, event_id, self._delivery_status.SENT
                         )
-                elif result == "expired":
+                elif result.status is PushSendStatus.EXPIRED:
                     expired_count += 1
                     self._store.mark_expired(subscription.endpoint)
                     if event_id:
@@ -196,24 +256,19 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
                         )
                 else:
                     failed_count += 1
+                    self._handle_send_failure(subscription.endpoint, result)
                     if event_id:
                         self._store.log_delivery(
                             subscription.id,
                             event_id,
                             self._delivery_status.FAILED,
-                            result,
+                            result.error_message,
                         )
-            except Exception as exc:
-                logger.exception("Error sending push to subscription %d: %s", subscription.id, exc)
+            except sqlite3.Error as exc:
+                logger.exception(
+                    "Store error while sending push to subscription %d: %s", subscription.id, exc
+                )
                 failed_count += 1
-                event_id = getattr(event, "id", None)
-                if event_id:
-                    self._store.log_delivery(
-                        subscription.id,
-                        event_id,
-                        self._delivery_status.FAILED,
-                        str(exc),
-                    )
 
         logger.info(
             "Web Push sent: success=%d, failed=%d, expired=%d",
@@ -221,11 +276,38 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
             failed_count,
             expired_count,
         )
+        self._cleanup_inactive_subscriptions()
         return WebPushResult(
             success_count=success_count,
             failed_count=failed_count,
             expired_count=expired_count,
         )
+
+    def _handle_send_failure(self, endpoint: str, result: PushSendResult) -> None:
+        """失敗を記録し、恒久的に失敗し続ける購読を自動無効化する (B12)。
+
+        404/410 以外にも 401/403 (VAPID 鍵不一致等) や恒常的 5xx を返す
+        endpoint は復活しないため、連続失敗回数で打ち切る。
+        """
+        failure_count = self._store.record_delivery_failure(endpoint)
+        if failure_count >= MAX_CONSECUTIVE_FAILURES:
+            self._store.mark_expired(endpoint)
+            logger.warning(
+                "連続 %d 回失敗した購読を無効化: %s (最終エラー: %s)",
+                failure_count,
+                endpoint[:50],
+                result.error_message,
+            )
+
+    def _cleanup_inactive_subscriptions(self) -> None:
+        """無効化済み購読の論理削除行を送信の機会に掃除する (B12)。"""
+        try:
+            deleted = self._store.delete_inactive_subscriptions()
+        except sqlite3.Error:
+            logger.exception("Failed to clean up inactive subscriptions")
+            return
+        if deleted > 0:
+            logger.info("Deleted %d inactive Web Push subscriptions", deleted)
 
     def _send_push(
         self,
@@ -233,13 +315,14 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
         p256dh_key: str,
         auth_key: str,
         payload: str,
-    ) -> str:
+    ) -> PushSendResult:
         """Send a single Web Push notification."""
         try:
             import pywebpush
+            import requests
         except ImportError:
             logger.error("pywebpush not installed")
-            return "pywebpush not installed"
+            return PushSendResult(status=PushSendStatus.FAILED, error_message="pywebpush not installed")
 
         subscription_info = {
             "endpoint": endpoint,
@@ -256,20 +339,24 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
                 data=payload,
                 vapid_private_key=self._vapid_private_key,
                 vapid_claims=vapid_claims,
+                timeout=DEFAULT_SEND_TIMEOUT_SEC,
             )
-            return "success"
+            return PushSendResult(status=PushSendStatus.SUCCESS)
         except pywebpush.WebPushException as exc:
+            status_code = None
             if hasattr(exc, "response") and exc.response is not None:
                 status_code = exc.response.status_code
                 if status_code in (404, 410):
                     logger.info("Subscription expired (HTTP %d): %s", status_code, endpoint[:50])
-                    return "expired"
+                    return PushSendResult(status=PushSendStatus.EXPIRED, status_code=status_code)
 
             logger.warning("WebPush error: %s", exc)
-            return str(exc)
-        except Exception as exc:
-            logger.exception("Unexpected error sending push: %s", exc)
-            return str(exc)
+            return PushSendResult(
+                status=PushSendStatus.FAILED, error_message=str(exc), status_code=status_code
+            )
+        except requests.RequestException as exc:
+            logger.warning("WebPush transport error: %s", exc)
+            return PushSendResult(status=PushSendStatus.FAILED, error_message=str(exc))
 
     def send_test(self, endpoint: str, p256dh_key: str, auth_key: str) -> bool:
         """Send a test notification to verify a subscription."""
@@ -283,4 +370,5 @@ class BaseWebPushSender(Generic[EventT, ProductT, StoreT]):
                 "tag": "test-notification",
             }
         )
-        return self._send_push(endpoint, p256dh_key, auth_key, payload) == "success"
+        result = self._send_push(endpoint, p256dh_key, auth_key, payload)
+        return result.status is PushSendStatus.SUCCESS
