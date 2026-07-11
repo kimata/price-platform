@@ -29,6 +29,9 @@
 ### コンテンツ (`content`)
 - About / お問い合わせ / 編集方針 / 基礎知識記事の構造化コンテンツモデルと YAML ローダ
 
+### 相場分析 (`market_analysis`)
+- 価格集計値 (MarketStats) から製品詳細ページ向けの相場分析文章 (MarketAnalysis) を生成する純粋ロジック
+
 ## セットアップ
 
 ```bash
