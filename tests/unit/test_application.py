@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import flask
 
@@ -45,7 +47,12 @@ def test_create_standard_webapi_app_builds_and_installs_dependencies(tmp_path: P
     def ping() -> str:
         return "pong"
 
-    config = SimpleNamespace(
+    @dataclass(frozen=True)
+    class _StubConfig:
+        webapp: Any
+        absolute_cache_path: Path
+
+    config = _StubConfig(
         webapp=SimpleNamespace(external_url="https://example.com"),
         absolute_cache_path=tmp_path / "cache",
     )

@@ -127,7 +127,7 @@ def _resolve_extension_key(*, extension_key: str | None, identity: AppIdentity |
     return extension_key
 
 
-def build_store_runtime_builder[PriceStoreT, PriceEventStoreT](
+def build_store_runtime_builder[ConfigT: SupportsStandardAppConfig, PriceStoreT, PriceEventStoreT](
     *,
     price_store_type: type[PriceStoreT],
     price_event_store_type: type[PriceEventStoreT],

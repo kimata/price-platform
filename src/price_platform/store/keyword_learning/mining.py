@@ -179,7 +179,7 @@ def _select_best_proposal(
     return best_proposal
 
 
-def _proposal_sort_key(proposal: KeywordProposal) -> tuple[float, float, int, int]:
+def _proposal_sort_key(proposal: KeywordProposal) -> tuple[float, float, int, float]:
     return (
         proposal.metrics["precision_lcb"],
         proposal.metrics["estimated_recall_gain"],

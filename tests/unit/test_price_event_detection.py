@@ -603,5 +603,6 @@ def test_detect_events_passes_selection_key_to_suppression() -> None:
 
     assert events, "イベントが検出されない"
     event_store = detector.event_store
+    assert isinstance(event_store, InMemoryEventStore)
     assert "B" in event_store.similar_query_selection_keys
     assert "B" in event_store.recent_query_selection_keys
