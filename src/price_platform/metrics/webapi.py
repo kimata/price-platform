@@ -51,6 +51,11 @@ class MetricsApiSpec:
         group_stats_key: Web Push ステータスのグループ統計キー（例: "maker_stats"）
         grouped_products_key: Web Push ステータスの製品グループキー
             （例: "product_by_category" / "product_by_maker"）
+        batch_product_count_key: amazon/batches レスポンスの製品数キー
+            （フロントエンド互換のため。例: "product_count" / "lens_count"）
+        register_notification_routes: twitter / webpush ステータスルートを共通実装で
+            登録するか。独自のレスポンス形式を維持したいアプリは False にして
+            自前のルートを Blueprint に追加する
     """
 
     get_config: Callable[[], Any]
@@ -63,6 +68,8 @@ class MetricsApiSpec:
     product_group_resolver: Callable[[str], str | None]
     group_stats_key: str
     grouped_products_key: str
+    batch_product_count_key: str = "product_count"
+    register_notification_routes: bool = True
 
 
 def create_metrics_api_blueprint(spec: MetricsApiSpec, *, name: str = "metrics") -> flask.Blueprint:
@@ -521,7 +528,7 @@ def create_metrics_api_blueprint(spec: MetricsApiSpec, *, name: str = "metrics")
                         "session_id": b.session_id,
                         "started_at": b.started_at.isoformat(),
                         "duration_sec": b.duration_sec,
-                        "product_count": b.product_count,
+                        spec.batch_product_count_key: b.product_count,
                         "success": b.success,
                         "error_message": b.error_message,
                     }
@@ -532,72 +539,75 @@ def create_metrics_api_blueprint(spec: MetricsApiSpec, *, name: str = "metrics")
             }
         ), 200
 
-    # ============================================================================
-    # Twitter Metrics Endpoints
-    # ============================================================================
+    if spec.register_notification_routes:
+        # ============================================================================
+        # Twitter Metrics Endpoints
+        # ============================================================================
 
-    def _get_notification_store() -> Any | None:
-        """Get notification store if configured."""
-        return spec.get_notification_store()
+        def _get_notification_store() -> Any | None:
+            """Get notification store if configured."""
+            return spec.get_notification_store()
 
-    @blueprint.route("/twitter", methods=["GET"])
-    @require_auth
-    def get_twitter_status() -> tuple[flask.Response, int]:
-        """Get Twitter posting status."""
-        config = get_config()
+        @blueprint.route("/twitter", methods=["GET"])
+        @require_auth
+        def get_twitter_status() -> tuple[flask.Response, int]:
+            """Get Twitter posting status."""
+            config = get_config()
 
-        if not config.notification or not config.notification.enabled:
-            return flask.jsonify({"enabled": False, "message": "Twitter通知は設定されていません"}), 200
+            if not config.notification or not config.notification.enabled:
+                return flask.jsonify({"enabled": False, "message": "Twitter通知は設定されていません"}), 200
 
-        if not config.notification.twitter or not config.notification.twitter.enabled:
-            return flask.jsonify({"enabled": False, "message": "Twitter投稿は無効です"}), 200
+            if not config.notification.twitter or not config.notification.twitter.enabled:
+                return flask.jsonify({"enabled": False, "message": "Twitter投稿は無効です"}), 200
 
-        store = _get_notification_store()
-        if store is None:
-            return flask.jsonify({"enabled": False, "message": "通知データベースが見つかりません"}), 200
+            store = _get_notification_store()
+            if store is None:
+                return flask.jsonify({"enabled": False, "message": "通知データベースが見つかりません"}), 200
 
-        try:
-            payload = build_twitter_status_payload(store=store, now=platform_time.now())
-            return flask.jsonify(payload), 200
-        except sqlite3.Error as e:
-            logger.exception("Failed to get Twitter status")
-            return flask.jsonify({"enabled": True, "error": str(e)}), 200
+            try:
+                payload = build_twitter_status_payload(store=store, now=platform_time.now())
+                return flask.jsonify(payload), 200
+            except sqlite3.Error as e:
+                logger.exception("Failed to get Twitter status")
+                return flask.jsonify({"enabled": True, "error": str(e)}), 200
 
-    def _resolve_product_group(product_id: str) -> str | None:
-        """Resolve group name for a product subscription."""
-        return spec.product_group_resolver(product_id)
+        def _resolve_product_group(product_id: str) -> str | None:
+            """Resolve group name for a product subscription."""
+            return spec.product_group_resolver(product_id)
 
-    def _get_webpush_store() -> Any | None:
-        """Get webpush store if configured."""
-        return spec.get_webpush_store()
+        def _get_webpush_store() -> Any | None:
+            """Get webpush store if configured."""
+            return spec.get_webpush_store()
 
-    @blueprint.route("/webpush", methods=["GET"])
-    @require_auth
-    def get_webpush_status() -> tuple[flask.Response, int]:
-        """Get Web Push notification status."""
-        config = get_config()
-        days = flask.request.args.get("days", 30, type=int)
+        @blueprint.route("/webpush", methods=["GET"])
+        @require_auth
+        def get_webpush_status() -> tuple[flask.Response, int]:
+            """Get Web Push notification status."""
+            config = get_config()
+            days = flask.request.args.get("days", 30, type=int)
 
-        if not config.notification.webpush or not config.notification.webpush.enabled:
-            return flask.jsonify({"enabled": False, "message": "Web Push通知は設定されていません"}), 200
+            if not config.notification.webpush or not config.notification.webpush.enabled:
+                return flask.jsonify({"enabled": False, "message": "Web Push通知は設定されていません"}), 200
 
-        store = _get_webpush_store()
-        if store is None:
-            return flask.jsonify({"enabled": False, "message": "Web Pushデータベースが見つかりません"}), 200
+            store = _get_webpush_store()
+            if store is None:
+                return flask.jsonify(
+                    {"enabled": False, "message": "Web Pushデータベースが見つかりません"}
+                ), 200
 
-        try:
-            payload = build_webpush_status_payload(
-                store=store,
-                now=platform_time.now(),
-                days=days,
-                product_group_resolver=_resolve_product_group,
-                group_stats_key=spec.group_stats_key,
-                grouped_products_key=spec.grouped_products_key,
-            )
-            return flask.jsonify(payload), 200
-        except sqlite3.Error as e:
-            logger.exception("Failed to get Web Push status")
-            return flask.jsonify({"enabled": True, "error": str(e)}), 200
+            try:
+                payload = build_webpush_status_payload(
+                    store=store,
+                    now=platform_time.now(),
+                    days=days,
+                    product_group_resolver=_resolve_product_group,
+                    group_stats_key=spec.group_stats_key,
+                    grouped_products_key=spec.grouped_products_key,
+                )
+                return flask.jsonify(payload), 200
+            except sqlite3.Error as e:
+                logger.exception("Failed to get Web Push status")
+                return flask.jsonify({"enabled": True, "error": str(e)}), 200
 
     # ============================================================================
     # Client Performance Metrics Endpoints
