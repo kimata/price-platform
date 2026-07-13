@@ -1,6 +1,5 @@
 """price_platform.metrics.webapi のテスト"""
 
-# ruff: noqa: S101
 
 from __future__ import annotations
 
@@ -80,7 +79,7 @@ class TestCreateBlueprint:
         """注入した認証デコレータが認証必須エンドポイントに適用される"""
 
         def deny_auth(func):
-            def wrapper(*args, **kwargs):  # noqa: ARG001
+            def wrapper(*args, **kwargs):
                 return flask.jsonify({"error": "unauthorized"}), 401
 
             wrapper.__name__ = func.__name__
