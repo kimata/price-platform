@@ -129,3 +129,4 @@ reportMissingImports = false
 
 [tool.ty]
 [tool.ty.rules]
+unresolved-import = "ignore"
