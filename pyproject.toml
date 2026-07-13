@@ -3,14 +3,14 @@ name = "price-platform"
 version = "0.1.0"
 description = "Shared webapp and auth foundation for product price applications"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "argon2-cffi>=23.1.0",
     "beautifulsoup4>=4.12.0",
     "docopt-ng>=0.9.0",
     "flask>=3.0.0",
     "flask-cors>=6.0.0",
-    "my-lib @ git+https://github.com/kimata/my-py-lib@b27271a732a1d0bad8d4b2d4fccfc62d7caac1f0",
+    "my-lib @ git+https://github.com/kimata/my-py-lib@738656ce5aae03d551e81dc2fad89b2466fb9626",
     "PyJWT>=2.8.0",
     "requests>=2.32.0",
     "selenium>=4.0.0",
@@ -19,20 +19,32 @@ authors = [
     { name = "KIMATA Tetsuya", email = "kimata@green-rabbit.net" }
 ]
 
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
+
 [dependency-groups]
 dev = [
+    "pre-commit>=4.5.1",
+    "flaky>=3.8.1",
+    "playwright>=1.57.0",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-html>=4.1.1",
+    "pytest-mock>=3.15.1",
+    "pytest-playwright>=0.7.2",
+    "pytest-xdist>=3.8.0",
+    "pytest-timeout>=2.4.0",
+    "time-machine>=3.2.0",
     "mypy>=1.19.1",
     "pyright>=1.1.408",
-    "pytest>=9.0.0",
-    "ruff==0.12.2",  # pre-commit の rev と揃える
     "ty>=0.0.1a7",
+    "types-pytz>=2025.2.0",
+    "types-paramiko>=4.0.0",
     "types-pyyaml>=6.0.12",
     "types-requests>=2.32.4",
+    "ruff==0.12.2",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/price_platform"]
@@ -41,8 +53,62 @@ include = ["src/price_platform/schema/*.schema"]
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
 [tool.uv]
 default-groups = ["dev"]
+exclude-newer = "1 week"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "semver"
+format = "{base}"
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+# E2E テストはデフォルトで除外（外部サーバーが必要なため）
+# E2E テスト実行: uv run pytest tests/e2e/ --host <host> --port <port>
+addopts = "--verbose --timeout=300 --durations=10 --log-file-level=DEBUG --log-format=\"%(asctime)s %(levelname)s [%(filename)s:%(lineno)s %(funcName)s] %(message)s\" --capture=sys --junit-xml=reports/junit-report.xml --html=reports/pytest.html --self-contained-html --cov=src --cov-report=html --cov-report=term-missing --cov-report=xml:reports/coverage.xml --cov-report=lcov:reports/coverage.lcov --numprocesses=auto --ignore=tests/e2e"
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore:datetime\\.datetime\\.utcfromtimestamp\\(\\) is deprecated:DeprecationWarning",
+    "ignore::DeprecationWarning:multiprocessing\\.popen_fork",
+    # pydub の警告（Python 3.12+ でのエスケープシーケンスと audioop 非推奨）
+    "ignore:invalid escape sequence:SyntaxWarning:pydub.*",
+    "ignore:'audioop' is deprecated:DeprecationWarning:pydub.*",
+    "ignore:unclosed database.*:ResourceWarning:rich.*",
+    "ignore:unclosed database.*:ResourceWarning:influxdb_client.*",
+    "ignore:unclosed database.*:ResourceWarning:coverage.*",
+    "ignore:unclosed database.*:ResourceWarning:time_machine.*",
+    "ignore:unclosed database.*:ResourceWarning:werkzeug.*",
+    "ignore:unclosed database.*:ResourceWarning:_pytest.*",
+    "ignore:unclosed database.*:ResourceWarning:typing.*",
+    "ignore:unclosed database.*:ResourceWarning:multiprocessing.*",
+    "ignore:unclosed database.*:ResourceWarning:logging.*",
+    "ignore::ResourceWarning:_pytest.unraisableexception",
+    "ignore::ResourceWarning:coverage.sqldata",
+    "ignore::ResourceWarning:coverage.collector",
+]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.coverage.html]
+directory = "reports/coverage"
 
 [tool.mypy]
 python_version = "3.12"
@@ -63,7 +129,3 @@ reportMissingImports = false
 
 [tool.ty]
 [tool.ty.rules]
-unresolved-import = "ignore"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
