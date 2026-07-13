@@ -3,8 +3,9 @@ image: gitlab.green-rabbit.net:5050/kimata/local-ubuntu:260104_3efe597c
 variables:
     UV_LINK_MODE: copy
     UV_CACHE_DIR: .uv-cache
-
+    PYRIGHT_PYTHON_FORCE_VERSION: latest
     UV_HTTP_TIMEOUT: "120"
+
     UV_EXTRA_INDEX_URL: "http://proxy:3141/simple/"
     UV_INSECURE_HOST: "proxy"
 
@@ -18,7 +19,7 @@ test-typecheck:
     needs: []
 
     before_script:
-        - uv sync --frozen --no-editable
+        - uv sync --locked --no-editable
 
     script:
         - uv run python -m pyright
@@ -31,7 +32,6 @@ test-typecheck:
                   - uv.lock
           fallback_keys:
               - uv-cache-${CI_PROJECT_ID}
-          policy: pull
           paths:
               - ${UV_CACHE_DIR}
               - .mypy_cache/
@@ -42,7 +42,7 @@ test-lint:
     needs: []
 
     before_script:
-        - uv sync --frozen --no-editable
+        - uv sync --locked --no-editable
 
     script:
         - uv run ruff check src tests
@@ -63,10 +63,12 @@ test-pytest:
     needs: []
 
     before_script:
-        - uv sync --frozen --no-editable
+        - uv sync --locked --no-editable
 
     script:
         - uv run pytest
+
+    coverage: '/TOTAL.*\s+(\d+%)/'
 
     cache:
         - key:
@@ -77,13 +79,24 @@ test-pytest:
           paths:
               - ${UV_CACHE_DIR}
 
+    artifacts:
+        when: always
+        paths:
+            - reports/**
+            - htmlcov/**
+        reports:
+            junit: reports/junit-report.xml
+            coverage_report:
+                coverage_format: cobertura
+                path: reports/coverage.xml
+
 update-cache:
     stage: renovate
 
     needs: []
 
     before_script:
-        - uv sync --frozen --no-editable
+        - uv sync --locked --no-editable
 
     script:
         - echo "Cache updated"
@@ -104,12 +117,13 @@ update-cache:
 
 renovate:
     stage: renovate
+
     dependencies: []
+
     resource_group: renovate
+
     image:
         name: gitlab.green-rabbit.net:5050/kimata/local-renovate:260104_3da7b77b
-
-    before_script: []
 
     variables:
         RENOVATE_CACHE_DIR: .renovate-cache
@@ -119,7 +133,7 @@ renovate:
         - renovate --platform gitlab --token ${RENOVATE_TOKEN} --endpoint ${CI_SERVER_URL}/api/v4 ${CI_PROJECT_PATH}
 
     cache:
-        key: renovate-${CI_PROJECT_ID}
+        key: ${CI_JOB_NAME}-${CI_PROJECT_ID}
         paths:
             - ${RENOVATE_CACHE_DIR}
 
@@ -127,6 +141,5 @@ renovate:
         - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
           when: never
         - if: $CI_PIPELINE_SOURCE == "schedule"
-        - if: $CI_PIPELINE_SOURCE == "push"
-          changes:
+        - changes:
               - renovate.json
