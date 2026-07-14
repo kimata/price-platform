@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import my_lib.store.flea_market
 import selenium.common.exceptions
@@ -146,8 +146,7 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
     def search_keyword(self, product: ProductT) -> str:
         """名前検索のキーワード (既定は product.spec.name)。"""
         # NOTE: spec 属性は Protocol で表現しづらいため Any 経由で参照する
-        spec_product: Any = product
-        return spec_product.spec.name
+        return cast("Any", product).spec.name
 
     def set_reference_prices(self, reference_prices: ReferencePrices) -> None:
         """Set reference prices for filtering."""
