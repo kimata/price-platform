@@ -140,7 +140,7 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         """売却済みアイテムの検索オーケストレーション (アプリ固有)。"""
         ...
 
-    def min_price_ratio(self, _product: ProductT) -> float:
+    def min_price_ratio(self, product: ProductT) -> float:
         """基準価格に対する下限比 (アプリ側で動的計算する場合はオーバーライド)。"""
         return DEFAULT_SUSPICIOUS_PRICE_RATIO_MIN
 
