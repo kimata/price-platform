@@ -145,7 +145,9 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
 
     def search_keyword(self, product: ProductT) -> str:
         """名前検索のキーワード (既定は product.spec.name)。"""
-        return product.spec.name  # type: ignore[attr-defined]
+        # NOTE: spec 属性は Protocol で表現しづらいため Any 経由で参照する
+        spec_product: Any = product
+        return spec_product.spec.name
 
     def set_reference_prices(self, reference_prices: ReferencePrices) -> None:
         """Set reference prices for filtering."""
