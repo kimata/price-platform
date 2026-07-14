@@ -179,6 +179,13 @@ class BaseScrapeEngine(ABC):
         """Amazon バッチ処理直前のフック (既定は何もしない)。"""
         return
 
+    def _default_max_attempts(self) -> int:
+        """リトライ回数を明示指定しない場合の既定値 (既定は 2)。
+
+        CI モードで回数を変える等のアプリはオーバーライドする。
+        """
+        return 2
+
     # --- 公開 API -----------------------------------------------------------
 
     def set_fetchers(self, fetchers: dict[Any, Any]) -> None:
@@ -402,9 +409,11 @@ class BaseScrapeEngine(ABC):
         store_type: Any,
         fetcher: Any,
         pool: Any,
-        max_attempts: int = 2,
+        max_attempts: int | None = None,
     ) -> Any:
         """リトライ付きでスクレイプする。"""
+        if max_attempts is None:
+            max_attempts = self._default_max_attempts()
         item_timing = None
         if self._metrics_manager:
             item_timing = self._metrics_manager.start_item(store_type.value, self._metrics_item_key(item))
@@ -449,9 +458,11 @@ class BaseScrapeEngine(ABC):
         store_type: Any,
         fetcher: Any,
         pool: Any,
-        max_attempts: int = 2,
+        max_attempts: int | None = None,
     ) -> Any:
         """リトライ付きで売却済みアイテムをスクレイプする。"""
+        if max_attempts is None:
+            max_attempts = self._default_max_attempts()
         store_name = f"{store_type.value}_sold"
         item_timing = None
         if self._metrics_manager:
