@@ -60,7 +60,8 @@ class FakeFetcher(FleaMarketPipelineMixin, FakeBase):
     absolute_minimum_price = 5000
 
     def __init__(self, *, search_module=None, reference_prices=None, fail_names=()):
-        super().__init__(None, reference_prices=reference_prices)
+        super().__init__(None)
+        self._reference_prices = reference_prices
         self._search_module = search_module or FakeSearchModule()
         self._fail_names = fail_names
         self.observed = []

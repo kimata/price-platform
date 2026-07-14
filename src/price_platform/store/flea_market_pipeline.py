@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import my_lib.store.flea_market
@@ -94,12 +95,12 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
     config: Any
 
     if TYPE_CHECKING:
+        # NOTE: メソッド宣言だとアプリ側 BaseFetcher の @contextmanager 実装と
+        # override 判定で衝突するため、属性スタイルで宣言する
+        get_webdriver: Callable[[], AbstractContextManager[tuple[WebDriver, WebDriverWait]]]
 
-        def get_webdriver(self) -> AbstractContextManager[tuple[WebDriver, WebDriverWait]]: ...
-
-    def __init__(self, *args: Any, reference_prices: ReferencePrices | None = None, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-        self._reference_prices = reference_prices or ReferencePrices()
+    # 参照価格 (アプリ側の __init__ か set_reference_prices() で設定する)
+    _reference_prices: ReferencePrices | None = None
 
     @property
     @abstractmethod
@@ -279,7 +280,8 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         # 商品名一致フィルタ (価格チェックより先)
         name_filter_result = self.filter_by_name(prices, product, label)
 
-        reference_price = self._reference_prices.get_reference_price(product.name)
+        reference_prices = self._reference_prices or ReferencePrices()
+        reference_price = reference_prices.get_reference_price(product.name)
         self.record_observations(product, label, reference_price, name_filter_result)
 
         prices = name_filter_result.admitted
@@ -294,9 +296,9 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         if sold and reference_price is None:
             logger.warning(
                 f"⚠️ {label}: {product.name} - 基準価格なし、価格フィルタをスキップ "
-                f"(yodobashi={product.name in self._reference_prices.yodobashi}, "
-                f"yahoo={product.name in self._reference_prices.yahoo}, "
-                f"amazon={product.name in self._reference_prices.amazon})"
+                f"(yodobashi={product.name in reference_prices.yodobashi}, "
+                f"yahoo={product.name in reference_prices.yahoo}, "
+                f"amazon={product.name in reference_prices.amazon})"
             )
         if reference_price:
             label_en = f"{self.store_name_en}(sold)" if sold else self.store_name_en
