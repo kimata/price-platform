@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, cast
@@ -49,7 +50,7 @@ class FakeBase:
     def __init__(self, config=None):
         self.config = config
 
-    def get_webdriver(self):
+    def get_webdriver(self) -> AbstractContextManager[tuple[Any, Any]]:
         return contextlib.nullcontext((DRIVER, WAIT))
 
 
