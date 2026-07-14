@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import logging
 import pathlib
-import sys
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-import docopt
 import my_lib.healthz
-import my_lib.logger
+import my_lib.healthz.cli
 from my_lib.platform import time as platform_time
 
 
@@ -159,35 +157,44 @@ def check_web_servers(_config: Any, definition: HealthzCliDefinition) -> bool:
     return True
 
 
-def run_healthz_cli(definition: HealthzCliDefinition, doc: str) -> None:
-    """Run a standard healthz CLI using the provided definition."""
-    args = docopt.docopt(doc)
-    config_file = pathlib.Path(args["-c"])
-    debug_mode = args["-D"]
-
-    my_lib.logger.init(definition.logger_name, level=logging.DEBUG if debug_mode else logging.INFO)
-    logging.info("設定ファイル: %s", config_file)
-
-    config = definition.config_loader(config_file)
-    targets: tuple[str, ...]
+def _selected_targets(args: dict[str, Any]) -> tuple[str, ...]:
     if args["--web"]:
-        targets = ("web",)
-    elif args["--crawler"]:
-        targets = ("crawler",)
-    else:
-        targets = ("crawler", "web")
+        return ("web",)
+    if args["--crawler"]:
+        return ("crawler",)
+    return ("crawler", "web")
 
-    all_ok = True
-    if "crawler" in targets and not check_crawler(config, definition):
-        all_ok = False
-    if "crawler" in targets and not check_detection_activity(config, definition):
-        all_ok = False
-    if "web" in targets and not check_web_servers(config, definition):
-        all_ok = False
 
-    if all_ok:
-        logging.info("OK.")
-        sys.exit(0)
+def run_healthz_cli(definition: HealthzCliDefinition, doc: str) -> None:
+    """Run a standard healthz CLI using the provided definition.
 
-    logging.error("NG.")
-    sys.exit(1)
+    共通骨格 (docopt → logger → config → 判定 → exit) は my_lib.healthz.cli に
+    委譲し、ここでは crawler / web / detection の各チェックを extra_checks として
+    供給する。--web / --crawler による対象選択は各チェック内で判定する。
+    """
+
+    def _load_config(config_file: str, args: dict[str, Any]) -> Any:
+        return definition.config_loader(pathlib.Path(config_file))
+
+    def crawler(config: Any, args: dict[str, Any]) -> bool:
+        if "crawler" not in _selected_targets(args):
+            return True
+        return check_crawler(config, definition)
+
+    def detection(config: Any, args: dict[str, Any]) -> bool:
+        if "crawler" not in _selected_targets(args):
+            return True
+        return check_detection_activity(config, definition)
+
+    def web(config: Any, args: dict[str, Any]) -> bool:
+        if "web" not in _selected_targets(args):
+            return True
+        return check_web_servers(config, definition)
+
+    spec = my_lib.healthz.cli.HealthzCliSpec(
+        logger_name=definition.logger_name,
+        config_loader=_load_config,
+        targets_builder=lambda config, args: [],
+        extra_checks=(crawler, detection, web),
+    )
+    my_lib.healthz.cli.run(spec, doc)
