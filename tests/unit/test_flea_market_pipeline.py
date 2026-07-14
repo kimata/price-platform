@@ -1,4 +1,3 @@
-# ruff: noqa: S101
 """price_platform.store.flea_market_pipeline のユニットテスト."""
 
 from __future__ import annotations
@@ -6,6 +5,7 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass, field
 from types import SimpleNamespace
+from typing import Any, cast
 
 import my_lib.store.flea_market
 import selenium.common.exceptions
@@ -33,6 +33,10 @@ class FakeSearchModule:
         return True
 
 
+DRIVER: Any = cast("Any", "driver")
+WAIT: Any = cast("Any", "wait")
+
+
 def _make_product(name="TEST-1"):
     return SimpleNamespace(name=name, id="prod-1", spec=SimpleNamespace(name=f"{name} SPEC"))
 
@@ -45,9 +49,8 @@ class FakeBase:
     def __init__(self, config=None):
         self.config = config
 
-    @contextlib.contextmanager
     def get_webdriver(self):
-        yield ("driver", "wait")
+        return contextlib.nullcontext((DRIVER, WAIT))
 
 
 class FakeFetcher(FleaMarketPipelineMixin, FakeBase):
@@ -137,7 +140,7 @@ class TestSearchByName:
     def test_condition_for_fetch(self):
         module = FakeSearchModule()
         fetcher = FakeFetcher(search_module=module)
-        fetcher.search_by_name("driver", "wait", _make_product())
+        fetcher.search_by_name(DRIVER, WAIT, _make_product())
 
         condition, max_items = module.conditions[0]
         assert condition.keyword == "TEST-1 SPEC"  # spec.name を使う
@@ -151,7 +154,7 @@ class TestSearchByName:
     def test_condition_for_sold(self):
         module = FakeSearchModule()
         fetcher = FakeFetcher(search_module=module)
-        fetcher.search_by_name("driver", "wait", _make_product(), sold=True)
+        fetcher.search_by_name(DRIVER, WAIT, _make_product(), sold=True)
 
         condition, _ = module.conditions[0]
         assert condition.sale_status == my_lib.store.flea_market.SaleStatus.SOLD_OUT
@@ -175,7 +178,7 @@ class TestScrapeTemplates:
 
     def test_warmup_delegates(self):
         fetcher = FakeFetcher()
-        assert fetcher.warmup("driver", "wait") is True
+        assert fetcher.warmup(DRIVER, WAIT) is True
 
     def test_set_reference_prices(self):
         fetcher = FakeFetcher()
