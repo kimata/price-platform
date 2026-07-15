@@ -1,4 +1,7 @@
 """price_platform.store.scrape_engine_base のユニットテスト."""
+# pyright: reportIncompatibleMethodOverride=false
+# 一部のテストダブルは抽象メソッドを意図的に None 返しで実装するため、
+# override 互換性チェックをファイル単位で無効化する。
 
 from __future__ import annotations
 
@@ -6,7 +9,7 @@ import contextlib
 import enum
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar
 
 from price_platform.store.scrape_engine_base import BaseScrapeEngine, ScrapeResult
 
@@ -69,11 +72,11 @@ def _make_item(name="I1", maker="M1"):
 
 
 class SampleEngine(BaseScrapeEngine):
-    WEBDRIVER_STORES = {Store.MERCARI}
-    TRUSTED_STORES = [Store.YODOBASHI, Store.YAHOO]
-    FILTERED_STORES = {Store.MERCARI}
-    FLEA_MARKET_STORES = {Store.MERCARI}
-    REFERENCE_PRICE_STORES = [Store.YODOBASHI, Store.YAHOO]
+    WEBDRIVER_STORES: ClassVar[set[Store]] = {Store.MERCARI}
+    TRUSTED_STORES: ClassVar[list[Store]] = [Store.YODOBASHI, Store.YAHOO]
+    FILTERED_STORES: ClassVar[set[Store]] = {Store.MERCARI}
+    FLEA_MARKET_STORES: ClassVar[set[Store]] = {Store.MERCARI}
+    REFERENCE_PRICE_STORES: ClassVar[list[Store]] = [Store.YODOBASHI, Store.YAHOO]
 
     def __init__(self, **kwargs):
         self.pool = FakePool()
@@ -136,9 +139,7 @@ class TestScrapeAll:
         assert results[-1].is_last_store_for_product
 
     def test_empty_stores_yields_dummy_result(self):
-        engine = SampleEngine(config=None)
         # フェッチャーは Amazon 以外を1つ登録するが _scrape_item が空を返すよう細工
-
         class EmptyEngine(SampleEngine):
             def _scrape_item(self, item, target_stores, pool, amazon_prices=None, warmed_up_makers=None):
                 return []
@@ -171,7 +172,9 @@ class TestRetry:
     def test_sold_retry_marks_sold(self):
         engine = SampleEngine(config=None)
         fetcher = FakeFetcher(prices=[FakePrice(300)])
-        result = engine._scrape_sold_with_retry(_make_item("A", maker="MK"), Store.MERCARI, fetcher, engine.pool)
+        result = engine._scrape_sold_with_retry(
+            _make_item("A", maker="MK"), Store.MERCARI, fetcher, engine.pool
+        )
         assert result.is_sold
         assert result.prices == [FakePrice(300)]
 

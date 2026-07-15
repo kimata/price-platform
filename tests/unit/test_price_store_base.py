@@ -70,13 +70,13 @@ class SampleStore(BasePriceStore):
     def _row_to_record(self, row):
         return Rec(
             product_id=row["product_id"],
-            vc_id=row["vc_id"] if "vc_id" in row.keys() else None,
+            vc_id=row["vc_id"] if "vc_id" in row.keys() else None,  # noqa: SIM118 - sqlite3.Row は in が値検索
             store=Store(row["store"]),
             price=row["price"],
             recorded_at=datetime.fromisoformat(row["recorded_at"]),
             is_used=bool(row["is_used"]),
-            url=row["url"] if "url" in row.keys() else None,
-            title=row["title"] if "title" in row.keys() else None,
+            url=row["url"] if "url" in row.keys() else None,  # noqa: SIM118 - sqlite3.Row は in が値検索
+            title=row["title"] if "title" in row.keys() else None,  # noqa: SIM118 - sqlite3.Row は in が値検索
         )
 
     def _variant_of(self, record):

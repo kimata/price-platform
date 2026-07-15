@@ -118,8 +118,8 @@ class BasePriceStore(SQLiteStoreBase):
         ]
         if null_variant_keys:
             conn.executemany(
-                f"DELETE FROM current_prices "
-                f"WHERE product_id = ? AND {vc} IS NULL AND store = ? AND is_used = ?",  # noqa: S608
+                f"DELETE FROM current_prices "  # noqa: S608 - VARIANT_COLUMN はクラス定数
+                f"WHERE product_id = ? AND {vc} IS NULL AND store = ? AND is_used = ?",
                 null_variant_keys,
             )
         conn.executemany(
