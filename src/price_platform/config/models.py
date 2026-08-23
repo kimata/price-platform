@@ -35,15 +35,20 @@ class AmazonStoreConfig:
 
 @dataclass(frozen=True)
 class RakutenStoreConfig:
-    """楽天 API 認証情報。"""
+    """楽天 API 認証情報。
+
+    access_key は 2026 年の新仕様（openapi.rakuten.co.jp）で必須になったアクセスキー。
+    """
 
     application_id: str
+    access_key: str | None = None
     affiliate_id: str | None = None
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> RakutenStoreConfig:
         return cls(
             application_id=data["application_id"],
+            access_key=data.get("access_key"),
             affiliate_id=data.get("affiliate_id"),
         )
 

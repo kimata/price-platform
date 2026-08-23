@@ -25,6 +25,7 @@ def _make_config_data() -> dict[str, object]:
             },
             "rakuten": {
                 "application_id": "rakuten-app",
+                "access_key": "rakuten-key",
                 "affiliate_id": "rakuten-aff",
             },
         },
@@ -77,6 +78,9 @@ def test_parse_app_config_for_resolves_paths_from_spec() -> None:
     assert config.database.path == base_dir / "data/price.db"
     assert config.metrics.auth.jwt_secret_path == base_dir / "data/jwt_secret.key"
     assert config.product_catalog_path == base_dir / "catalog/products.yaml"
+    assert config.store.rakuten.application_id == "rakuten-app"
+    assert config.store.rakuten.access_key == "rakuten-key"
+    assert config.store.rakuten.affiliate_id == "rakuten-aff"
     assert config.liveness.file.crawler == Path("/dev/shm/test-app/healthz")
     assert config.cache.path == base_dir / "cache"
 
