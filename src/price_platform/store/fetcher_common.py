@@ -23,8 +23,7 @@ from .price_quarantine import QuarantinedPrice
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    from selenium.webdriver.remote.webdriver import WebDriver
-    from selenium.webdriver.support.wait import WebDriverWait
+    from my_lib.browser import Page
 
 logger = logging.getLogger(__name__)
 
@@ -582,22 +581,19 @@ class SharedBaseFetcher[
         return None
 
     @contextlib.contextmanager
-    def get_webdriver(self) -> Generator[tuple[WebDriver, WebDriverWait], None, None]:
-        import selenium.webdriver.support.wait
-
+    def get_webdriver(self) -> Generator[Page, None, None]:
         from price_platform.platform import browser
 
         data_path = pathlib.Path(self.config.selenium.data_path)
-        driver = browser.create_driver(
+        manager = browser.create_browser_manager(
             profile_name=self._webdriver_profile_name,
-            data_path=data_path,
-            is_headless=self.config.selenium.headless,
+            data_dir=data_path,
+            headless=self.config.selenium.headless,
         )
-        wait = selenium.webdriver.support.wait.WebDriverWait(driver, 10)
         try:
-            yield driver, wait
+            yield manager.get_page()
         finally:
-            browser.quit_driver_gracefully(driver)
+            manager.quit()
 
     @abstractmethod
     def scrape(self, product: ProductT) -> list[ScrapedPriceT]:
@@ -606,19 +602,17 @@ class SharedBaseFetcher[
     def scrape_with_webdriver(
         self,
         product: ProductT,
-        driver: WebDriver,
-        wait: WebDriverWait,
+        page: Page,
     ) -> list[ScrapedPriceT]:
-        _ = driver, wait
+        _ = page
         return self.scrape(product)
 
     def scrape_sold_with_webdriver(
         self,
         product: ProductT,
-        driver: WebDriver,
-        wait: WebDriverWait,
+        page: Page,
     ) -> list[ScrapedPriceT]:
-        _ = product, driver, wait
+        _ = product, page
         return []
 
     def scrape_all(self, products: list[ProductT]) -> dict[str, list[ScrapedPriceT]]:

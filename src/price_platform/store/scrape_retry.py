@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, TypeVar
 
-import selenium.common.exceptions
+import my_lib.browser
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def run_scrape_with_retry[PriceT](
 
             return ScrapeRetryOutcome(prices=prices, success=True)
 
-        except selenium.common.exceptions.TimeoutException as exc:
+        except my_lib.browser.WaitTimeoutError as exc:
             last_error = exc
             if on_timeout is not None:
                 on_timeout()

@@ -17,16 +17,15 @@ from abc import abstractmethod
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+import my_lib.browser
 import my_lib.store.flea_market
-import selenium.common.exceptions
 
 from .fetcher_common import FilterResult, ReferencePrices, exclude_suspicious_prices
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
 
-    from selenium.webdriver.remote.webdriver import WebDriver
-    from selenium.webdriver.support.wait import WebDriverWait
+    from my_lib.browser import Page
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +51,7 @@ class FleaMarketSearchModule(Protocol):
 
     def search(
         self,
-        driver: WebDriver,
-        wait: WebDriverWait,
+        page: Page,
         condition: my_lib.store.flea_market.SearchCondition,
         max_items: int,
     ) -> list[my_lib.store.flea_market.SearchResult]:
@@ -62,8 +60,7 @@ class FleaMarketSearchModule(Protocol):
 
     def warmup(
         self,
-        driver: WebDriver,
-        wait: WebDriverWait,
+        page: Page,
     ) -> bool:
         """Warm up the browser by visiting the site via Google search."""
         ...
@@ -97,7 +94,7 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
     if TYPE_CHECKING:
         # NOTE: メソッド宣言だとアプリ側 BaseFetcher の @contextmanager 実装と
         # override 判定で衝突するため、属性スタイルで宣言する
-        get_webdriver: Callable[[], AbstractContextManager[tuple[WebDriver, WebDriverWait]]]
+        get_webdriver: Callable[[], AbstractContextManager[Page]]
 
     # 参照価格 (アプリ側の __init__ か set_reference_prices() で設定する)
     _reference_prices: ReferencePrices | None = None
@@ -127,16 +124,12 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         ...
 
     @abstractmethod
-    def _fetch_prices(
-        self, driver: WebDriver, wait: WebDriverWait, product: ProductT
-    ) -> list[ScrapedPriceT]:
+    def _fetch_prices(self, page: Page, product: ProductT) -> list[ScrapedPriceT]:
         """検索オーケストレーション (アプリ固有)。"""
         ...
 
     @abstractmethod
-    def _fetch_sold_prices(
-        self, driver: WebDriver, wait: WebDriverWait, product: ProductT
-    ) -> list[ScrapedPriceT]:
+    def _fetch_sold_prices(self, page: Page, product: ProductT) -> list[ScrapedPriceT]:
         """売却済みアイテムの検索オーケストレーション (アプリ固有)。"""
         ...
 
@@ -153,12 +146,12 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         """Set reference prices for filtering."""
         self._reference_prices = reference_prices
 
-    def warmup(self, driver: WebDriver, wait: WebDriverWait) -> bool:
+    def warmup(self, page: Page) -> bool:
         """Google 検索経由でフリマサイトにアクセスしてウォームアップする。
 
         bot 検出を回避するため、初回アクセス前に呼び出す。
         """
-        return self.search_module.warmup(driver, wait)
+        return self.search_module.warmup(page)
 
     def sold_label(self) -> str:
         return f"{self.store_name_ja}(売却済)"
@@ -166,57 +159,55 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
     # --- scrape 系テンプレート ------------------------------------------------
 
     def scrape(self, product: ProductT) -> list[ScrapedPriceT]:
-        """Fetch prices using WebDriver."""
-        with self.get_webdriver() as (driver, wait):
-            return self._fetch_prices(driver, wait, product)
+        """Fetch prices using a browser page."""
+        with self.get_webdriver() as page:
+            return self._fetch_prices(page, product)
 
     def scrape_with_webdriver(
         self,
         product: ProductT,
-        driver: WebDriver,
-        wait: WebDriverWait,
+        page: Page,
     ) -> list[ScrapedPriceT]:
-        """Fetch prices using an external WebDriver."""
-        return self._fetch_prices(driver, wait, product)
+        """Fetch prices using an external browser page."""
+        return self._fetch_prices(page, product)
 
     def scrape_all(self, products: list[ProductT]) -> dict[str, list[ScrapedPriceT]]:
-        """Fetch prices for multiple products using a single WebDriver session."""
+        """Fetch prices for multiple products using a single browser session."""
         results: dict[str, list[ScrapedPriceT]] = {}
-        with self.get_webdriver() as (driver, wait):
+        with self.get_webdriver() as page:
             for product in products:
                 try:
-                    prices = self._fetch_prices(driver, wait, product)
+                    prices = self._fetch_prices(page, product)
                     results[product.name] = prices
                     logger.info(f"{self.store_name_ja}: {product.name} - {len(prices)}件取得")
-                except selenium.common.exceptions.WebDriverException as e:
+                except my_lib.browser.BrowserError as e:
                     logger.error(f"❌ {self.store_name_ja}: {product.name} - エラー: {e}")
                     results[product.name] = []
         return results
 
     def scrape_sold(self, product: ProductT) -> list[ScrapedPriceT]:
         """Fetch sold items."""
-        with self.get_webdriver() as (driver, wait):
-            return self._fetch_sold_prices(driver, wait, product)
+        with self.get_webdriver() as page:
+            return self._fetch_sold_prices(page, product)
 
     def scrape_sold_with_webdriver(
         self,
         product: ProductT,
-        driver: WebDriver,
-        wait: WebDriverWait,
+        page: Page,
     ) -> list[ScrapedPriceT]:
-        """Fetch sold items using an external WebDriver."""
-        return self._fetch_sold_prices(driver, wait, product)
+        """Fetch sold items using an external browser page."""
+        return self._fetch_sold_prices(page, product)
 
     def scrape_all_sold(self, products: list[ProductT]) -> dict[str, list[ScrapedPriceT]]:
-        """Fetch sold items for multiple products using a single WebDriver session."""
+        """Fetch sold items for multiple products using a single browser session."""
         results: dict[str, list[ScrapedPriceT]] = {}
         sold_label = self.sold_label()
-        with self.get_webdriver() as (driver, wait):
+        with self.get_webdriver() as page:
             for product in products:
                 try:
-                    prices = self._fetch_sold_prices(driver, wait, product)
+                    prices = self._fetch_sold_prices(page, product)
                     results[product.name] = prices
-                except selenium.common.exceptions.WebDriverException as e:
+                except my_lib.browser.BrowserError as e:
                     logger.error(f"❌ {sold_label}: {product.name} - エラー: {e}")
                     results[product.name] = []
         return results
@@ -225,8 +216,7 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
 
     def search_by_name(
         self,
-        driver: WebDriver,
-        wait: WebDriverWait,
+        page: Page,
         product: ProductT,
         *,
         sold: bool = False,
@@ -247,8 +237,7 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         )
 
         return self.search_module.search(
-            driver,
-            wait,
+            page,
             condition,
             max_items=self.MAX_SEARCH_RESULTS,
         )

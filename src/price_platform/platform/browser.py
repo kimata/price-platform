@@ -2,50 +2,28 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
+import my_lib.browser
+
 if TYPE_CHECKING:
-    from my_lib.browser_manager import BrowserManager
-    from selenium.webdriver.remote.webdriver import WebDriver
-else:
-    BrowserManager = object
+    from pathlib import Path
+
+# BrowserManager を本モジュール名前空間へ再エクスポート（呼び出し側の型注釈用）。
+BrowserManager = my_lib.browser.BrowserManager
 
 
 def create_browser_manager(
     *,
     profile_name: str,
     data_dir: Path,
-    clear_profile_on_error: bool = True,
-    max_retry_on_error: int = 2,
-) -> BrowserManager:
-    from my_lib.browser_manager import BrowserManager as BrowserManagerImpl
-
-    return BrowserManagerImpl(
-        profile_name=profile_name,
-        data_dir=data_dir,
-        clear_profile_on_error=clear_profile_on_error,
-        max_retry_on_error=max_retry_on_error,
+    headless: bool = False,
+) -> my_lib.browser.BrowserManager:
+    """Page 抽象を提供する BrowserManager を生成する。"""
+    return my_lib.browser.BrowserManager(
+        my_lib.browser.BrowserProfile(
+            name=profile_name,
+            data_dir=data_dir,
+            headless=headless,
+        ),
     )
-
-
-def create_driver(*, profile_name: str, data_path: Path, is_headless: bool) -> WebDriver:
-    from my_lib.selenium_util import create_driver as create_driver_impl
-
-    return create_driver_impl(
-        profile_name=profile_name,
-        data_path=data_path,
-        is_headless=is_headless,
-    )
-
-
-def quit_driver_gracefully(driver: WebDriver) -> None:
-    from my_lib.selenium_util import quit_driver_gracefully as quit_driver_gracefully_impl
-
-    quit_driver_gracefully_impl(driver)
-
-
-def clear_cache(driver: WebDriver) -> None:
-    from my_lib.selenium_util import clear_cache as clear_cache_impl
-
-    clear_cache_impl(driver)

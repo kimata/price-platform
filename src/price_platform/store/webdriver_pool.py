@@ -9,11 +9,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar, Protocol, TypeVar
 
+import my_lib.browser
+
 from price_platform.platform import browser
 
 if TYPE_CHECKING:
-    from selenium.webdriver.remote.webdriver import WebDriver
-    from selenium.webdriver.support.wait import WebDriverWait
+    from my_lib.browser import Page
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ class _SeleniumConfigOwner(Protocol):
 class _SeleniumConfigLike(Protocol):
     @property
     def data_path(self) -> pathlib.Path: ...
+    @property
+    def headless(self) -> bool: ...
 
 
 ConfigT = TypeVar("ConfigT", bound=_SeleniumConfigOwner)
@@ -45,12 +48,12 @@ class BaseWebDriverPool[MakerT, ConfigT: _SeleniumConfigOwner]:
     profile_name_getter: Callable[[MakerT], str]
     page_load_timeout: int | None = None
     max_size: int | None = None
-    _managers: OrderedDict[MakerT, browser.BrowserManager] = field(
+    _managers: OrderedDict[MakerT, my_lib.browser.BrowserManager] = field(
         default_factory=OrderedDict, init=False
     )
     _consecutive_timeout_counts: dict[MakerT, int] = field(default_factory=dict, init=False)
 
-    def _get_or_create_manager(self, maker: MakerT) -> browser.BrowserManager:
+    def _get_or_create_manager(self, maker: MakerT) -> my_lib.browser.BrowserManager:
         if maker in self._managers:
             self._managers.move_to_end(maker)
         else:
@@ -61,8 +64,7 @@ class BaseWebDriverPool[MakerT, ConfigT: _SeleniumConfigOwner]:
             self._managers[maker] = browser.create_browser_manager(
                 profile_name=profile_name,
                 data_dir=data_path,
-                clear_profile_on_error=True,
-                max_retry_on_error=2,
+                headless=self.config.selenium.headless,
             )
             logger.info("WebDriver を作成: %s", profile_name)
         return self._managers[maker]
@@ -75,12 +77,11 @@ class BaseWebDriverPool[MakerT, ConfigT: _SeleniumConfigOwner]:
         oldest_manager.quit()
         self._consecutive_timeout_counts.pop(oldest_maker, None)
 
-    def get(self, maker: MakerT) -> tuple[WebDriver, WebDriverWait]:
+    def get(self, maker: MakerT) -> Page:
         manager = self._get_or_create_manager(maker)
-        driver, wait = manager.get_driver()
-        if self.page_load_timeout is not None:
-            driver.set_page_load_timeout(self.page_load_timeout)
-        return driver, wait
+        # NOTE: page_load_timeout は Patchright バックエンドでは auto-wait に統合され、
+        # 個別の set_page_load_timeout 相当を持たないためフィールドは受け取るが未使用。
+        return manager.get_page()
 
     def notify_timeout(self, maker: MakerT) -> bool:
         count = self._consecutive_timeout_counts.get(maker, 0) + 1
@@ -123,8 +124,7 @@ class BaseWebDriverPool[MakerT, ConfigT: _SeleniumConfigOwner]:
 
     def clear_cache(self) -> None:
         for maker, manager in self._managers.items():
-            driver, _ = manager.get_driver()
-            browser.clear_cache(driver)
+            manager.get_browser().maintenance.clear_cache()
             logger.info("ブラウザキャッシュをクリア: %s", self.profile_name_getter(maker))
 
     def __enter__(self) -> BaseWebDriverPool[MakerT, ConfigT]:

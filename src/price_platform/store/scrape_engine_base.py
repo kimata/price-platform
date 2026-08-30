@@ -448,9 +448,9 @@ class BaseScrapeEngine(ABC):
         )
 
     def _scrape_with_webdriver(self, item: Any, fetcher: Any, pool: Any) -> list[Any]:
-        """WebDriver を使用してスクレイプする。"""
-        driver, wait = pool.get(self._item_pool_key(item))
-        return fetcher.scrape_with_webdriver(item, driver, wait)
+        """ブラウザページを使用してスクレイプする。"""
+        page = pool.get(self._item_pool_key(item))
+        return fetcher.scrape_with_webdriver(item, page)
 
     def _scrape_sold_with_retry(
         self,
@@ -470,7 +470,7 @@ class BaseScrapeEngine(ABC):
 
         maker = self._item_pool_key(item)
         outcome = run_scrape_with_retry(
-            execute=lambda: fetcher.scrape_sold_with_webdriver(item, *pool.get(maker)),
+            execute=lambda: fetcher.scrape_sold_with_webdriver(item, pool.get(maker)),
             store_name=store_name,
             item_name=item.name,
             max_attempts=max_attempts,
@@ -494,11 +494,11 @@ class BaseScrapeEngine(ABC):
 
         Google 検索経由で各フリマサイトにアクセスし、Cookie/セッションを確立する。
         """
-        driver, wait = pool.get(maker)
+        page = pool.get(maker)
         for store_type in self.FLEA_MARKET_STORES:
             fetcher = self._fetchers.get(store_type)
             if isinstance(fetcher, FleaMarketPipelineMixin):
-                if fetcher.warmup(driver, wait):
+                if fetcher.warmup(page):
                     logger.info(f"{store_type.value}: ウォームアップ完了 ({maker.value})")
                 else:
                     logger.warning(f"{store_type.value}: ウォームアップ失敗 ({maker.value})")

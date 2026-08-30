@@ -33,7 +33,7 @@ class FakePool:
         self.successes: list[Any] = []
 
     def get(self, maker):
-        return (f"driver-{maker}", f"wait-{maker}")
+        return f"page-{maker}"
 
     def notify_timeout(self, maker):
         self.timeouts.append(maker)
@@ -55,11 +55,11 @@ class FakeFetcher:
         self.scraped.append(item)
         return self._per_item.get(item.name, self._prices)
 
-    def scrape_with_webdriver(self, item, driver, wait):
+    def scrape_with_webdriver(self, item, page):
         self.scraped.append(item)
         return self._per_item.get(item.name, self._prices)
 
-    def scrape_sold_with_webdriver(self, item, driver, wait):
+    def scrape_sold_with_webdriver(self, item, page):
         self.scraped.append(item)
         return self._per_item.get(item.name, self._prices)
 
@@ -241,14 +241,14 @@ class TestWarmup:
             def record_observations(self, product, store_label, reference_price, result):  # pragma: no cover
                 return None
 
-            def _fetch_prices(self, driver, wait, product):  # pragma: no cover
+            def _fetch_prices(self, page, product):  # pragma: no cover
                 return []
 
-            def _fetch_sold_prices(self, driver, wait, product):  # pragma: no cover
+            def _fetch_sold_prices(self, page, product):  # pragma: no cover
                 return []
 
-            def warmup(self, driver, wait):
-                warmed.append((driver, wait))
+            def warmup(self, page):
+                warmed.append(page)
                 return True
 
         engine = SampleEngine(config=None)

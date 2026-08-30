@@ -4,8 +4,8 @@ import time
 import unittest.mock
 from dataclasses import dataclass
 
+import my_lib.browser
 import pytest
-import selenium.common.exceptions
 
 import price_platform.store.scrape_retry
 from price_platform.store.scrape_retry import run_scrape_with_retry
@@ -38,7 +38,7 @@ def test_run_scrape_with_retry_retries_timeout_and_succeeds(monkeypatch: pytest.
         nonlocal attempts
         attempts += 1
         if attempts == 1:
-            raise selenium.common.exceptions.TimeoutException("slow")
+            raise my_lib.browser.WaitTimeoutError("slow")
         return [1, 2]
 
     def on_timeout() -> None:
@@ -78,7 +78,7 @@ def test_run_scrape_with_retry_reports_failure(monkeypatch: pytest.MonkeyPatch) 
     item_timing = DummyItemTiming()
 
     def execute() -> list[int]:
-        raise selenium.common.exceptions.TimeoutException("slow")
+        raise my_lib.browser.WaitTimeoutError("slow")
 
     def on_timeout() -> None:
         nonlocal timeouts
@@ -101,10 +101,10 @@ def test_run_scrape_with_retry_reports_failure(monkeypatch: pytest.MonkeyPatch) 
 
     assert outcome.success is False
     assert outcome.prices == []
-    assert outcome.error_message == "Message: slow\n"
+    assert outcome.error_message == "slow"
     assert timeouts == 2
     assert item_timing.success_count == 0
-    assert item_timing.failure_messages == ["Message: slow\n"]
+    assert item_timing.failure_messages == ["slow"]
 
 
 def _check_protocol_conformance() -> None:

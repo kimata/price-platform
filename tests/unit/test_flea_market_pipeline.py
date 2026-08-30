@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, cast
 
+import my_lib.browser
 import my_lib.store.flea_market
-import selenium.common.exceptions
 
 from price_platform.store.fetcher_common import FilterResult, ProductNameRule, ReferencePrices
 from price_platform.store.flea_market_pipeline import FleaMarketPipelineMixin
@@ -26,16 +26,15 @@ class FakeSearchModule:
     results: list = field(default_factory=list)
     conditions: list = field(default_factory=list)
 
-    def search(self, driver, wait, condition, max_items):
+    def search(self, page, condition, max_items):
         self.conditions.append((condition, max_items))
         return self.results
 
-    def warmup(self, driver, wait):
+    def warmup(self, page):
         return True
 
 
-DRIVER: Any = cast("Any", "driver")
-WAIT: Any = cast("Any", "wait")
+PAGE: Any = cast("Any", "page")
 
 
 def _make_product(name="TEST-1"):
@@ -50,8 +49,8 @@ class FakeBase:
     def __init__(self, config=None):
         self.config = config
 
-    def get_webdriver(self) -> AbstractContextManager[tuple[Any, Any]]:
-        return contextlib.nullcontext((DRIVER, WAIT))
+    def get_webdriver(self) -> AbstractContextManager[Any]:
+        return contextlib.nullcontext(PAGE)
 
 
 class FakeFetcher(FleaMarketPipelineMixin, FakeBase):
@@ -78,12 +77,12 @@ class FakeFetcher(FleaMarketPipelineMixin, FakeBase):
     def record_observations(self, product, store_label, reference_price, result):
         self.observed.append((product.name, store_label, reference_price, len(result.admitted)))
 
-    def _fetch_prices(self, driver, wait, product):
+    def _fetch_prices(self, page, product):
         if product.name in self._fail_names:
-            raise selenium.common.exceptions.WebDriverException("boom")
+            raise my_lib.browser.BrowserError("boom")
         return [FakePrice(price=10000)]
 
-    def _fetch_sold_prices(self, driver, wait, product):
+    def _fetch_sold_prices(self, page, product):
         return [FakePrice(price=20000)]
 
 
@@ -142,7 +141,7 @@ class TestSearchByName:
     def test_condition_for_fetch(self):
         module = FakeSearchModule()
         fetcher = FakeFetcher(search_module=module)
-        fetcher.search_by_name(DRIVER, WAIT, _make_product())
+        fetcher.search_by_name(PAGE, _make_product())
 
         condition, max_items = module.conditions[0]
         assert condition.keyword == "TEST-1 SPEC"  # spec.name を使う
@@ -156,7 +155,7 @@ class TestSearchByName:
     def test_condition_for_sold(self):
         module = FakeSearchModule()
         fetcher = FakeFetcher(search_module=module)
-        fetcher.search_by_name(DRIVER, WAIT, _make_product(), sold=True)
+        fetcher.search_by_name(PAGE, _make_product(), sold=True)
 
         condition, _ = module.conditions[0]
         assert condition.sale_status == my_lib.store.flea_market.SaleStatus.SOLD_OUT
@@ -180,7 +179,7 @@ class TestScrapeTemplates:
 
     def test_warmup_delegates(self):
         fetcher = FakeFetcher()
-        assert fetcher.warmup(DRIVER, WAIT) is True
+        assert fetcher.warmup(PAGE) is True
 
     def test_set_reference_prices(self):
         fetcher = FakeFetcher()
