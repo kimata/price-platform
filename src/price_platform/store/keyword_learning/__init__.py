@@ -3,7 +3,7 @@
 from .cli import main as cli_main
 from .mining import analyze_observations
 from .scoring import score_observation
-from .store import KeywordLearningStore, open_keyword_learning_store
+from .store import KeywordLearningStore, open_keyword_learning_store, record_filter_result_safely
 from .types import (
     AnalysisWindow,
     FilterObservationContext,
@@ -22,5 +22,6 @@ __all__ = [
     "analyze_observations",
     "cli_main",
     "open_keyword_learning_store",
+    "record_filter_result_safely",
     "score_observation",
 ]

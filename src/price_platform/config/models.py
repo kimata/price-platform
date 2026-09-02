@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from price_platform.platform import notify as platform_notify
+
 
 def _resolve_path(value: str | Path, *, base_dir: Path) -> Path:
     path = Path(value)
@@ -379,6 +381,7 @@ class AppConfig:
     cache: CacheConfig
     notification: NotificationConfig = field(default_factory=NotificationConfig)
     client_metrics: ClientMetricsConfig = field(default_factory=ClientMetricsConfig)
+    slack: platform_notify.SlackConfigTypes = field(default_factory=platform_notify.empty_slack_config)
     _base_dir: Path = field(default_factory=Path.cwd, repr=False)
 
     def get_absolute_path(self, relative_path: Path) -> Path:

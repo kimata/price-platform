@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -8,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from price_platform.platform import clock
+from price_platform.platform import notify as platform_notify
 from price_platform.schema_registry import resolve_schema_path
 from price_platform.sqlite_store import SQLiteStoreBase
 from price_platform.store.fetcher_common import FilterResult
@@ -20,6 +22,8 @@ from .types import (
     ProposalStatus,
     serialize_json_payload,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class KeywordLearningStore(SQLiteStoreBase):
@@ -349,3 +353,39 @@ class KeywordLearningStore(SQLiteStoreBase):
 
 def open_keyword_learning_store(db_path: Path) -> KeywordLearningStore:
     return KeywordLearningStore(db_path)
+
+
+def record_filter_result_safely(
+    db_path: Path,
+    *,
+    context: FilterObservationContext,
+    result: FilterResult[Any],
+    title_normalizer: Callable[[str], str],
+    slack_config: platform_notify.SlackConfigTypes | None = None,
+) -> bool:
+    """学習 DB へフィルタ観測を記録する。失敗してもスクレイプ処理を巻き込まない。
+
+    学習 DB はスクレイプ結果本体と独立した補助データであり、破損等で書き込みに
+    失敗しても価格収集は継続すべき（学習 DB 破損が全ストアの取得結果を
+    失敗扱いにし、価格保存が止まる障害の再発防止）。失敗は ERROR ログに加え、
+    slack_config があればレート制限付きで Slack のエラーチャンネルにも通知し、
+    静かに壊れたままにならないようにする。
+
+    Returns:
+        記録に成功したら True
+    """
+    try:
+        store = open_keyword_learning_store(db_path)
+        store.record_filter_result(context=context, result=result, title_normalizer=title_normalizer)
+    except sqlite3.Error as exc:
+        logger.error("キーワード学習 DB への記録に失敗しました (%s): %s", db_path, exc)
+        if slack_config is not None:
+            platform_notify.error(
+                slack_config,
+                f"{context.project}: キーワード学習 DB 書き込み失敗",
+                f"キーワード学習 DB ({db_path}) への書き込みに失敗しました。\n"
+                f"エラー: {exc}\n"
+                "DB 破損の場合はファイルを退避してください（スキーマは次回オープン時に自動作成されます）。",
+            )
+        return False
+    return True

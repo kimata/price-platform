@@ -15,9 +15,13 @@ from price_platform.store.fetcher_common import (
     default_keyword_in_title,
     filter_by_product_name_match,
 )
+import price_platform.store.keyword_learning.store as keyword_learning_store_module
 from price_platform.store.keyword_learning.cli import main as keyword_learning_main
 from price_platform.store.keyword_learning.mining import analyze_observations
-from price_platform.store.keyword_learning.store import open_keyword_learning_store
+from price_platform.store.keyword_learning.store import (
+    open_keyword_learning_store,
+    record_filter_result_safely,
+)
 from price_platform.store.keyword_learning.types import FilterObservationContext
 
 
@@ -339,3 +343,99 @@ def test_record_analysis_run_deduplicates_same_started_at(tmp_path) -> None:
 
     assert first_payload not in counts
     assert counts[second_payload] == 1
+
+
+def _make_observation_inputs():
+    prices = [
+        DummyListing(price=100000, url="https://example.com/a", title="Canon RF50mm F1.2 USM body"),
+    ]
+    rule = ProductNameRule(
+        required_keywords=("RF50MM",),
+        flea_market_ng_words=(),
+        condition_ng_words=(),
+    )
+    result = filter_by_product_name_match(
+        prices,
+        "RF50mm F1.2 USM",
+        "mercari",
+        rule=rule,
+        matching_policy=DEFAULT_PRODUCT_NAME_MATCHING_POLICY,
+    )
+    context = FilterObservationContext(
+        project="lens-fleama",
+        product_id="rf50mm-f12",
+        product_name="RF50mm F1.2 USM",
+        store_name="mercari",
+        reference_price=120000,
+        captured_at=clock.now(),
+    )
+    return context, result
+
+
+def test_record_filter_result_safely_records_on_healthy_db(tmp_path) -> None:
+    db_path = tmp_path / "keyword_learning.db"
+    context, result = _make_observation_inputs()
+
+    ok = record_filter_result_safely(
+        db_path,
+        context=context,
+        result=result,
+        title_normalizer=DEFAULT_PRODUCT_NAME_MATCHING_POLICY.normalize_title,
+    )
+
+    assert ok is True
+    store = open_keyword_learning_store(db_path)
+    assert len(store.list_observations(project="lens-fleama")) == 1
+
+
+def test_record_filter_result_safely_survives_corrupted_db(tmp_path, monkeypatch) -> None:
+    """DB 破損時に例外を伝播させず False を返し、Slack 通知を行う。
+
+    学習 DB の破損がスクレイプ結果全体を失敗扱いにしてしまう障害の再発防止。
+    """
+    db_path = tmp_path / "keyword_learning.db"
+    # SQLite ヘッダだけ正しく、中身が壊れたファイルを作る
+    db_path.write_bytes(b"SQLite format 3\x00" + b"\xde\xad\xbe\xef" * 1024)
+
+    notified: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        keyword_learning_store_module.platform_notify,
+        "error",
+        lambda _config, title, message: notified.append((title, message)),
+    )
+
+    context, result = _make_observation_inputs()
+    ok = record_filter_result_safely(
+        db_path,
+        context=context,
+        result=result,
+        title_normalizer=DEFAULT_PRODUCT_NAME_MATCHING_POLICY.normalize_title,
+        slack_config=object(),  # 通知パスに入ることの確認用（モック済みなので型は不問）
+    )
+
+    assert ok is False
+    assert len(notified) == 1
+    assert "lens-fleama" in notified[0][0]
+
+
+def test_record_filter_result_safely_skips_notify_without_slack_config(tmp_path, monkeypatch) -> None:
+    db_path = tmp_path / "keyword_learning.db"
+    db_path.write_bytes(b"SQLite format 3\x00" + b"\xde\xad\xbe\xef" * 1024)
+
+    notified: list[str] = []
+    monkeypatch.setattr(
+        keyword_learning_store_module.platform_notify,
+        "error",
+        lambda _config, title, _message: notified.append(title),
+    )
+
+    context, result = _make_observation_inputs()
+    ok = record_filter_result_safely(
+        db_path,
+        context=context,
+        result=result,
+        title_normalizer=DEFAULT_PRODUCT_NAME_MATCHING_POLICY.normalize_title,
+    )
+
+    assert ok is False
+    assert notified == []

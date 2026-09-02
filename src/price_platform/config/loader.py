@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 import price_platform._adapters
+from price_platform.platform import notify as platform_notify
 
 from .models import (
     AppConfig,
@@ -40,7 +41,7 @@ REQUIRED_SECTIONS = (
     "product_catalog_path",
     "cache",
 )
-OPTIONAL_SECTIONS = ("notification", "client_metrics")
+OPTIONAL_SECTIONS = ("notification", "client_metrics", "slack")
 
 
 @dataclass(frozen=True)
@@ -164,5 +165,6 @@ def parse_app_config_for[ConfigT: AppConfig](
         cache=CacheConfig.parse(data["cache"], base_dir=base_dir),
         notification=NotificationConfig.parse(data.get("notification"), base_dir=base_dir),
         client_metrics=ClientMetricsConfig.parse(data.get("client_metrics"), base_dir=base_dir),
+        slack=platform_notify.parse_slack_config(data.get("slack")),
         _base_dir=base_dir,
     )
