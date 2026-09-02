@@ -65,6 +65,10 @@ class ScrapeResult:
     is_sold: bool = False
 
 
+class ScrapeInterruptedError(Exception):
+    """シャットダウン要求によりアイテム処理を途中で打ち切った。"""
+
+
 class BaseScrapeEngine(ABC):
     """アイテム中心の巡回を行うスクレイピングエンジンの基底。
 
@@ -105,6 +109,7 @@ class BaseScrapeEngine(ABC):
         self._metrics_manager = metrics_manager
         self._price_store = price_store
         self._checkpoint_callback = checkpoint_callback
+        self._shutdown_check: Callable[[], bool] | None = None
         self._ci_mode = ci_mode
         self._product_interval_sec = 0.0 if ci_mode else PRODUCT_INTERVAL_SEC
         self._flea_market_interval_sec = 0.0 if ci_mode else FLEA_MARKET_INTERVAL_SEC
@@ -265,6 +270,8 @@ class BaseScrapeEngine(ABC):
         Amazon は API 呼び出し回数を抑えるため、最初に全アイテムをまとめて処理する。
         その後、各アイテムを他のストアでスクレイプし、1 アイテム処理するごとに yield。
         """
+        self._shutdown_check = shutdown_check
+
         if shutdown_check and shutdown_check():
             logger.info("シャットダウンが要求されたため、スクレイプを中断します")
             return
@@ -298,9 +305,13 @@ class BaseScrapeEngine(ABC):
                 logger.info("シャットダウンが要求されたため、スクレイプを中断します")
                 return
 
-            item_results = self._scrape_item(
-                item, remaining_stores, pool, amazon_prices, warmed_up_makers
-            )
+            try:
+                item_results = self._scrape_item(
+                    item, remaining_stores, pool, amazon_prices, warmed_up_makers
+                )
+            except ScrapeInterruptedError as e:
+                logger.info("シャットダウンが要求されたため、アイテム処理を打ち切ります: %s", e)
+                return
 
             if item_results:
                 item_results[-1] = replace(item_results[-1], is_last_store_for_product=True)
@@ -342,9 +353,7 @@ class BaseScrapeEngine(ABC):
         if shutdown_check and shutdown_check():
             return results
 
-        items_with_asin = [
-            item for item in items if self._is_item_applicable(item, self.amazon_store)
-        ]
+        items_with_asin = [item for item in items if self._is_item_applicable(item, self.amazon_store)]
         if not items_with_asin:
             return results
 
@@ -412,6 +421,7 @@ class BaseScrapeEngine(ABC):
         max_attempts: int | None = None,
     ) -> Any:
         """リトライ付きでスクレイプする。"""
+        self._raise_if_shutdown_requested(store_type.value, item.name)
         if max_attempts is None:
             max_attempts = self._default_max_attempts()
         item_timing = None
@@ -447,6 +457,16 @@ class BaseScrapeEngine(ABC):
             error_message=outcome.error_message,
         )
 
+    def _raise_if_shutdown_requested(self, store_name: str, item_name: str) -> None:
+        """シャットダウン要求があれば ScrapeInterruptedError を送出する。
+
+        アイテム 1 件は最大で全ストア分（数分）の処理になるため、ストア単位で
+        打ち切れるようにし、SIGTERM 後の猶予内に finally（ブラウザ終了・
+        メトリクスセッション終了）へ到達できるようにする。
+        """
+        if self._shutdown_check is not None and self._shutdown_check():
+            raise ScrapeInterruptedError(f"{store_name}: {item_name}")
+
     def _scrape_with_webdriver(self, item: Any, fetcher: Any, pool: Any) -> list[Any]:
         """ブラウザページを使用してスクレイプする。"""
         page = pool.get(self._item_pool_key(item))
@@ -461,9 +481,10 @@ class BaseScrapeEngine(ABC):
         max_attempts: int | None = None,
     ) -> Any:
         """リトライ付きで売却済みアイテムをスクレイプする。"""
+        store_name = f"{store_type.value}_sold"
+        self._raise_if_shutdown_requested(store_name, item.name)
         if max_attempts is None:
             max_attempts = self._default_max_attempts()
-        store_name = f"{store_type.value}_sold"
         item_timing = None
         if self._metrics_manager:
             item_timing = self._metrics_manager.start_item(store_name, self._metrics_item_key(item))

@@ -158,6 +158,43 @@ class TestScrapeAll:
         results = engine.scrape_all([_make_item("A")], shutdown_check=lambda: True)
         assert results == []
 
+    def test_shutdown_requested_mid_item_stops_before_next_store(self):
+        """アイテム処理中にシャットダウン要求があれば、次のストアへ進まず打ち切る"""
+        engine = SampleEngine(config=None)
+        calls: list[tuple[str, str]] = []
+
+        class RecordingFetcher(FakeFetcher):
+            def __init__(self, store_name: str):
+                super().__init__(prices=[FakePrice(1)])
+                self._store_name = store_name
+
+            def scrape(self, item):
+                calls.append((self._store_name, item.name))
+                return super().scrape(item)
+
+        engine.set_fetchers(
+            {
+                Store.YAHOO: RecordingFetcher("yahoo"),
+                Store.YODOBASHI: RecordingFetcher("yodobashi"),
+            }
+        )
+        # 最初のストア処理が終わった時点でシャットダウン要求が立つ
+        results = engine.scrape_all(
+            [_make_item("A"), _make_item("B")],
+            shutdown_check=lambda: bool(calls),
+        )
+
+        # SampleEngine はストア名順 (yahoo → yodobashi) に処理する
+        assert calls == [("yahoo", "A")]
+        assert results == []
+
+    def test_shutdown_check_not_consulted_outside_iteration(self):
+        """scrape_iter を経由しない直接呼び出しではシャットダウン判定を行わない"""
+        engine = SampleEngine(config=None)
+        fetcher = FakeFetcher(prices=[FakePrice(1)])
+        result = engine._scrape_with_retry(_make_item("A"), Store.YODOBASHI, fetcher, None)
+        assert result.success
+
 
 class TestRetry:
     def test_webdriver_store_uses_pool(self):
@@ -199,9 +236,8 @@ class TestHooks:
     def test_metrics_item_key_default_is_name(self):
         recorded: list[tuple[str, str]] = []
         mm = SimpleNamespace(
-            start_item=lambda store, key: recorded.append((store, key)) or SimpleNamespace(
-                success=lambda: None, failure=lambda msg=None: None
-            )
+            start_item=lambda store, key: recorded.append((store, key))
+            or SimpleNamespace(success=lambda: None, failure=lambda msg=None: None)
         )
         engine = SampleEngine(config=None, metrics_manager=mm)
         engine._scrape_with_retry(_make_item("A"), Store.YODOBASHI, FakeFetcher(prices=[]), None)
@@ -212,9 +248,7 @@ class TestHooks:
         assert engine._price_threshold == {}
 
     def test_historical_reference_price(self):
-        store = SimpleNamespace(
-            get_lowest_price_by_stores=lambda name, stores: 4200 if name == "A" else None
-        )
+        store = SimpleNamespace(get_lowest_price_by_stores=lambda name, stores: 4200 if name == "A" else None)
         engine = SampleEngine(config=None, price_store=store)
         assert engine._get_historical_reference_price("A") == 4200
         assert engine._get_historical_reference_price("Z") is None
