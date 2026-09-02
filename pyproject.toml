@@ -10,7 +10,7 @@ dependencies = [
     "docopt-ng>=0.9.0",
     "flask>=3.0.0",
     "flask-cors>=6.0.0",
-    "my-lib @ git+https://github.com/kimata/my-py-lib@f2ad097cebf4a7f36f5b51506f1fedbaac341b96",
+    "my-lib @ git+https://github.com/kimata/my-py-lib@a74f73ef0fe7a091b18a0db17afaab507a62a28c",
     "patchright>=1.62.0",
     "PyJWT>=2.8.0",
     "requests>=2.32.0",
