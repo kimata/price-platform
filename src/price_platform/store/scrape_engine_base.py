@@ -422,6 +422,7 @@ class BaseScrapeEngine(ABC):
     ) -> Any:
         """リトライ付きでスクレイプする。"""
         self._raise_if_shutdown_requested(store_type.value, item.name)
+        self._checkpoint()
         if max_attempts is None:
             max_attempts = self._default_max_attempts()
         item_timing = None
@@ -457,6 +458,16 @@ class BaseScrapeEngine(ABC):
             error_message=outcome.error_message,
         )
 
+    def _checkpoint(self) -> None:
+        """liveness / heartbeat を更新する。
+
+        アイテム 1 件は全ストア分で数分かかるため、アイテム単位の更新だけでは
+        healthz の許容時間（liveness interval × 2）を超えて Pod が再起動されることが
+        あった。ストア処理の直前にも更新して「進行中」を示す。
+        """
+        if self._checkpoint_callback is not None:
+            self._checkpoint_callback()
+
     def _raise_if_shutdown_requested(self, store_name: str, item_name: str) -> None:
         """シャットダウン要求があれば ScrapeInterruptedError を送出する。
 
@@ -483,6 +494,7 @@ class BaseScrapeEngine(ABC):
         """リトライ付きで売却済みアイテムをスクレイプする。"""
         store_name = f"{store_type.value}_sold"
         self._raise_if_shutdown_requested(store_name, item.name)
+        self._checkpoint()
         if max_attempts is None:
             max_attempts = self._default_max_attempts()
         item_timing = None

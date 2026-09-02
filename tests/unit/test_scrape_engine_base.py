@@ -188,6 +188,20 @@ class TestScrapeAll:
         assert calls == [("yahoo", "A")]
         assert results == []
 
+    def test_checkpoint_called_before_each_store(self):
+        """liveness/heartbeat 更新（checkpoint）がストア処理ごとに呼ばれる"""
+        calls: list[int] = []
+        engine = SampleEngine(config=None, checkpoint_callback=lambda: calls.append(1))
+        engine.set_fetchers(
+            {
+                Store.YAHOO: FakeFetcher(prices=[FakePrice(1)]),
+                Store.YODOBASHI: FakeFetcher(prices=[FakePrice(2)]),
+            }
+        )
+        engine.scrape_all([_make_item("A"), _make_item("B")])
+        # 2 アイテム × 2 ストア
+        assert len(calls) == 4
+
     def test_shutdown_check_not_consulted_outside_iteration(self):
         """scrape_iter を経由しない直接呼び出しではシャットダウン判定を行わない"""
         engine = SampleEngine(config=None)
