@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, TypeAlias
+from typing import Any
 
 import my_lib.notify.slack
 
-SlackConfigTypes: TypeAlias = my_lib.notify.slack.SlackConfigTypes
+type SlackConfigTypes = my_lib.notify.slack.SlackConfigTypes
 
 
 def parse_slack_config(data: dict[str, Any] | None) -> SlackConfigTypes:

@@ -7,7 +7,9 @@ from datetime import timedelta
 import pytest
 
 import price_platform.store as store_module
+import price_platform.store.keyword_learning.store as keyword_learning_store_module
 from price_platform.platform import clock
+from price_platform.platform import notify as platform_notify
 from price_platform.store.fetcher_common import (
     DEFAULT_PRODUCT_NAME_MATCHING_POLICY,
     FilterReason,
@@ -15,7 +17,6 @@ from price_platform.store.fetcher_common import (
     default_keyword_in_title,
     filter_by_product_name_match,
 )
-import price_platform.store.keyword_learning.store as keyword_learning_store_module
 from price_platform.store.keyword_learning.cli import main as keyword_learning_main
 from price_platform.store.keyword_learning.mining import analyze_observations
 from price_platform.store.keyword_learning.store import (
@@ -135,12 +136,12 @@ def test_keyword_learning_store_records_observations_and_generates_proposals(tmp
 
     for day in range(35):
         missing_prices = [
-                DummyListing(
-                    price=98000,
-                    url=f"https://example.com/missing-{day}",
-                    title="Canon RF50mm F1.2 body",
-                )
-            ]
+            DummyListing(
+                price=98000,
+                url=f"https://example.com/missing-{day}",
+                title="Canon RF50mm F1.2 body",
+            )
+        ]
         missing_result = filter_by_product_name_match(
             missing_prices,
             "RF50mm F1.2 USM",
@@ -410,7 +411,7 @@ def test_record_filter_result_safely_survives_corrupted_db(tmp_path, monkeypatch
         context=context,
         result=result,
         title_normalizer=DEFAULT_PRODUCT_NAME_MATCHING_POLICY.normalize_title,
-        slack_config=object(),  # 通知パスに入ることの確認用（モック済みなので型は不問）
+        slack_config=platform_notify.empty_slack_config(),  # 通知パスに入ることの確認用（error はモック済み）
     )
 
     assert ok is False
