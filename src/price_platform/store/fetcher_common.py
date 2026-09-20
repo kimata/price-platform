@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar, Protocol, TypeVar
 
+import my_lib.browser
 import requests
 from bs4 import BeautifulSoup
 
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from my_lib.browser import Page
 
 logger = logging.getLogger(__name__)
+
 
 class _HasName(Protocol):
     @property
@@ -404,9 +406,7 @@ def exclude_suspicious_prices[ScrapedPriceT: _HasPrice](
         if price.price < threshold_min or price.price > threshold_max:
             excluded_count += 1
             if quarantine_recorder is not None:
-                reason = (
-                    "below_min_threshold" if price.price < threshold_min else "above_max_threshold"
-                )
+                reason = "below_min_threshold" if price.price < threshold_min else "above_max_threshold"
                 quarantine_recorder(
                     QuarantinedPrice(
                         product_name=product_name,
@@ -517,9 +517,9 @@ def filter_by_color_label_profile[ScrapedPriceT: _HasPrice](
     )
 
 
-class SharedBaseFetcher[
-    ProductT: _HasName, ScrapedPriceT: _HasPrice, ConfigT: FetcherConfigProtocol, StoreT
-](ABC):
+class SharedBaseFetcher[ProductT: _HasName, ScrapedPriceT: _HasPrice, ConfigT: FetcherConfigProtocol, StoreT](
+    ABC
+):
     """HTTP / WebDriver を併用する取得基底クラス。"""
 
     store_type: StoreT
@@ -581,7 +581,11 @@ class SharedBaseFetcher[
         return None
 
     @contextlib.contextmanager
-    def get_webdriver(self) -> Generator[Page, None, None]:
+    def browser_session(self) -> Generator[my_lib.browser.BrowserManager, None, None]:
+        """このフェッチャー専用のブラウザを起動し、with を抜けると終了する。
+
+        複数商品を続けて処理するときは、この中で商品ごとに `manager.page()` を開く。
+        """
         from price_platform.platform import browser
 
         data_path = pathlib.Path(self.config.selenium.data_path)
@@ -591,9 +595,15 @@ class SharedBaseFetcher[
             headless=self.config.selenium.headless,
         )
         try:
-            yield manager.get_page()
+            yield manager
         finally:
             manager.quit()
+
+    @contextlib.contextmanager
+    def get_webdriver(self) -> Generator[Page, None, None]:
+        """専用ブラウザを起動してタブを 1 つ開き、with を抜けるとタブとブラウザを閉じる。"""
+        with self.browser_session() as manager, manager.page() as page:
+            yield page
 
     @abstractmethod
     def scrape(self, product: ProductT) -> list[ScrapedPriceT]:

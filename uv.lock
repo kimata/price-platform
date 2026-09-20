@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-09-01T05:35:04.530523453Z"
+exclude-newer = "2026-09-13T02:33:19.888650824Z"
 exclude-newer-span = "P1W"
 
 [[package]]
@@ -1296,7 +1296,7 @@ wheels = [
 [[package]]
 name = "my-lib"
 version = "0.2.0"
-source = { git = "https://github.com/kimata/my-py-lib?rev=c6829d41a5640d5ca7532140670db664f6652184#c6829d41a5640d5ca7532140670db664f6652184" }
+source = { git = "https://github.com/kimata/my-py-lib?rev=2396a082d68e98ad807e06041293f5c364d100b6#2396a082d68e98ad807e06041293f5c364d100b6" }
 dependencies = [
     { name = "coloredlogs" },
     { name = "dacite" },
@@ -1531,7 +1531,7 @@ requires-dist = [
     { name = "docopt-ng", specifier = ">=0.9.0" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "flask-cors", specifier = ">=6.0.0" },
-    { name = "my-lib", git = "https://github.com/kimata/my-py-lib?rev=c6829d41a5640d5ca7532140670db664f6652184" },
+    { name = "my-lib", git = "https://github.com/kimata/my-py-lib?rev=2396a082d68e98ad807e06041293f5c364d100b6" },
     { name = "patchright", specifier = ">=1.62.0" },
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "requests", specifier = ">=2.32.0" },

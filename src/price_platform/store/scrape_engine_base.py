@@ -479,9 +479,9 @@ class BaseScrapeEngine(ABC):
             raise ScrapeInterruptedError(f"{store_name}: {item_name}")
 
     def _scrape_with_webdriver(self, item: Any, fetcher: Any, pool: Any) -> list[Any]:
-        """ブラウザページを使用してスクレイプする。"""
-        page = pool.get(self._item_pool_key(item))
-        return fetcher.scrape_with_webdriver(item, page)
+        """ブラウザページを使用してスクレイプする（タブは商品ごとに開いて閉じる）。"""
+        with pool.page(self._item_pool_key(item)) as page:
+            return fetcher.scrape_with_webdriver(item, page)
 
     def _scrape_sold_with_retry(
         self,
@@ -502,8 +502,13 @@ class BaseScrapeEngine(ABC):
             item_timing = self._metrics_manager.start_item(store_name, self._metrics_item_key(item))
 
         maker = self._item_pool_key(item)
+
+        def execute() -> Any:
+            with pool.page(maker) as page:
+                return fetcher.scrape_sold_with_webdriver(item, page)
+
         outcome = run_scrape_with_retry(
-            execute=lambda: fetcher.scrape_sold_with_webdriver(item, pool.get(maker)),
+            execute=execute,
             store_name=store_name,
             item_name=item.name,
             max_attempts=max_attempts,
@@ -527,14 +532,15 @@ class BaseScrapeEngine(ABC):
 
         Google 検索経由で各フリマサイトにアクセスし、Cookie/セッションを確立する。
         """
-        page = pool.get(maker)
-        for store_type in self.FLEA_MARKET_STORES:
-            fetcher = self._fetchers.get(store_type)
-            if isinstance(fetcher, FleaMarketPipelineMixin):
-                if fetcher.warmup(page):
-                    logger.info(f"{store_type.value}: ウォームアップ完了 ({maker.value})")
-                else:
-                    logger.warning(f"{store_type.value}: ウォームアップ失敗 ({maker.value})")
+        # NOTE: Cookie はブラウザコンテキストに残るので、別タブで行っても以降の検索に効く。
+        with pool.page(maker) as page:
+            for store_type in self.FLEA_MARKET_STORES:
+                fetcher = self._fetchers.get(store_type)
+                if isinstance(fetcher, FleaMarketPipelineMixin):
+                    if fetcher.warmup(page):
+                        logger.info(f"{store_type.value}: ウォームアップ完了 ({maker.value})")
+                    else:
+                        logger.warning(f"{store_type.value}: ウォームアップ失敗 ({maker.value})")
 
     # --- 基準価格ロード -----------------------------------------------------
 

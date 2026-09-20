@@ -52,6 +52,9 @@ class FakeBase:
     def get_webdriver(self) -> AbstractContextManager[Any]:
         return contextlib.nullcontext(PAGE)
 
+    def browser_session(self) -> AbstractContextManager[Any]:
+        return contextlib.nullcontext(SimpleNamespace(page=lambda: contextlib.nullcontext(PAGE)))
+
 
 class FakeFetcher(FleaMarketPipelineMixin, FakeBase):
     store_name_ja = "テストストア"

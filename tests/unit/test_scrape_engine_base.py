@@ -32,8 +32,9 @@ class FakePool:
         self.timeouts: list[Any] = []
         self.successes: list[Any] = []
 
-    def get(self, maker):
-        return f"page-{maker}"
+    @contextlib.contextmanager
+    def page(self, maker):
+        yield f"page-{maker}"
 
     def notify_timeout(self, maker):
         self.timeouts.append(maker)

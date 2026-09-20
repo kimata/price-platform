@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import pathlib
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar, Protocol, TypeVar
 
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MakerT = TypeVar("MakerT")
+
+
 class _SeleniumConfigOwner(Protocol):
     @property
     def selenium(self) -> _SeleniumConfigLike: ...
@@ -77,11 +80,18 @@ class BaseWebDriverPool[MakerT, ConfigT: _SeleniumConfigOwner]:
         oldest_manager.quit()
         self._consecutive_timeout_counts.pop(oldest_maker, None)
 
-    def get(self, maker: MakerT) -> Page:
+    @contextlib.contextmanager
+    def page(self, maker: MakerT) -> Iterator[Page]:
+        """メーカー用ブラウザで新しいタブを開いて返し、with を抜けると閉じる。
+
+        タブに紐づくリソース（CDP セッション・iframe・Route）はタブを閉じるまで
+        解放されないため、スコープは 1 商品の処理単位にすること。
+        """
         manager = self._get_or_create_manager(maker)
         # NOTE: page_load_timeout は Patchright バックエンドでは auto-wait に統合され、
         # 個別の set_page_load_timeout 相当を持たないためフィールドは受け取るが未使用。
-        return manager.get_page()
+        with manager.page() as page:
+            yield page
 
     def notify_timeout(self, maker: MakerT) -> bool:
         count = self._consecutive_timeout_counts.get(maker, 0) + 1

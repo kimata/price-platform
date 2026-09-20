@@ -95,6 +95,7 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         # NOTE: メソッド宣言だとアプリ側 BaseFetcher の @contextmanager 実装と
         # override 判定で衝突するため、属性スタイルで宣言する
         get_webdriver: Callable[[], AbstractContextManager[Page]]
+        browser_session: Callable[[], AbstractContextManager[my_lib.browser.BrowserManager]]
 
     # 参照価格 (アプリ側の __init__ か set_reference_prices() で設定する)
     _reference_prices: ReferencePrices | None = None
@@ -172,12 +173,14 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         return self._fetch_prices(page, product)
 
     def scrape_all(self, products: list[ProductT]) -> dict[str, list[ScrapedPriceT]]:
-        """Fetch prices for multiple products using a single browser session."""
+        """Fetch prices for multiple products using a single browser (one tab per product)."""
         results: dict[str, list[ScrapedPriceT]] = {}
-        with self.get_webdriver() as page:
+        with self.browser_session() as manager:
             for product in products:
                 try:
-                    prices = self._fetch_prices(page, product)
+                    # タブは商品ごとに開いて閉じる（ブラウザは共有）
+                    with manager.page() as page:
+                        prices = self._fetch_prices(page, product)
                     results[product.name] = prices
                     logger.info(f"{self.store_name_ja}: {product.name} - {len(prices)}件取得")
                 except my_lib.browser.BrowserError as e:
@@ -199,13 +202,14 @@ class FleaMarketPipelineMixin[ProductT: _HasNameAndId, ScrapedPriceT: _HasPrice]
         return self._fetch_sold_prices(page, product)
 
     def scrape_all_sold(self, products: list[ProductT]) -> dict[str, list[ScrapedPriceT]]:
-        """Fetch sold items for multiple products using a single browser session."""
+        """Fetch sold items for multiple products using a single browser (one tab per product)."""
         results: dict[str, list[ScrapedPriceT]] = {}
         sold_label = self.sold_label()
-        with self.get_webdriver() as page:
+        with self.browser_session() as manager:
             for product in products:
                 try:
-                    prices = self._fetch_sold_prices(page, product)
+                    with manager.page() as page:
+                        prices = self._fetch_sold_prices(page, product)
                     results[product.name] = prices
                 except my_lib.browser.BrowserError as e:
                     logger.error(f"❌ {sold_label}: {product.name} - エラー: {e}")
